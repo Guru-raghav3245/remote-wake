@@ -1,0 +1,49 @@
+name: WakeProbe
+options:
+  deploymentTarget:
+    macOS: "14.0"
+settings:
+  base:
+    DEVELOPMENT_TEAM: 65Q59PGHMZ
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    ENABLE_DEBUG_DYLIB: NO
+targets:
+  WakeProbe:
+    type: application
+    platform: macOS
+    sources: [WakeProbe]
+    info:
+      path: Config/WakeProbe-Info.plist
+      properties:
+        CFBundleDisplayName: Wake Probe
+        NSPrincipalClass: NSApplication
+    entitlements:
+      path: Config/WakeProbe.entitlements
+      properties:
+        com.apple.developer.aps-environment: development
+        com.apple.security.application-groups: [group.com.guru.wakeprobe]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.guru.wakeprobe
+    dependencies:
+      - target: NotificationService
+  NotificationService:
+    type: app-extension
+    platform: macOS
+    sources: [NotificationService]
+    info:
+      path: Config/NotificationService-Info.plist
+      properties:
+        CFBundleDisplayName: Wake Probe Service
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService
+    entitlements:
+      path: Config/NotificationService.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups: [group.com.guru.wakeprobe]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.guru.wakeprobe.service
