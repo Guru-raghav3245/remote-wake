@@ -61,7 +61,7 @@ def guarded_sleep(target, interval):
                 break
             log('sleeping, idle=%.0fs' % idle)
             subprocess.run(['pmset', 'sleepnow'])
-            return
+            break          # sleepnow returns before the Mac is asleep; wait for the wake below instead of starting another cycle
         time.sleep(2)
     else:
         log('staying awake, idle=%.0fs blockers=%s' % (idle_s(), blockers()))
