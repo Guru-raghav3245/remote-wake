@@ -65,7 +65,9 @@ def guarded_sleep(target, interval):
         time.sleep(2)
     else:
         log('staying awake, idle=%.0fs blockers=%s' % (idle_s(), blockers()))
-    time.sleep(min(max(0, target - time.time()), interval + 5))   # cap protects against clock jumps
+    deadline = min(target, time.time() + interval + 5)              # cap protects against clock jumps
+    while time.time() < deadline:                                   # wall clock: time.sleep() does not count time spent asleep
+        time.sleep(1)
 
 log('start dry=%s' % DRY)
 fails, cycles, interval = 0, 0, 30
