@@ -3,7 +3,7 @@
 set -e; cd "$(dirname "$0")"
 A="build/Remote Wake.app"; rm -rf build; mkdir -p "$A/Contents/MacOS"
 swiftc -O -parse-as-library -o "$A/Contents/MacOS/RemoteWake" RemoteWakeMenu.swift
-mkdir -p "$A/Contents/Resources/agent"; cp ../agent/tailscale-install.sh ../agent/stayawake-install.sh ../agent/stayawake-uninstall.sh ../agent/com.guru.stayawake.plist "$A/Contents/Resources/agent/"
+mkdir -p "$A/Contents/Resources/agent"; cp AppIcon.icns "$A/Contents/Resources/"; cp ../agent/tailscale-install.sh ../agent/stayawake-install.sh ../agent/stayawake-uninstall.sh ../agent/com.guru.stayawake.plist "$A/Contents/Resources/agent/"
 [ -d vendor/tailscale ] && cp -R vendor/tailscale "$A/Contents/Resources/tailscale" || echo "note: no vendor/tailscale (run ./build-tailscale.sh); app will not bundle Tailscale"
 cat > "$A/Contents/Info.plist" <<P
 <?xml version="1.0" encoding="UTF-8"?>
@@ -12,6 +12,7 @@ cat > "$A/Contents/Info.plist" <<P
 <key>CFBundleName</key><string>Remote Wake</string>
 <key>CFBundleIdentifier</key><string>com.guru.remotewake.menu</string>
 <key>CFBundleExecutable</key><string>RemoteWake</string>
+<key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>0.1</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
