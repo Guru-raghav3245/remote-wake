@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:xterm/xterm.dart';
 import 'engine.dart';
+import 'native.dart';
+import 'store.dart';
 
 // Interactive shell on the Mac: polls the Go engine for output, sends keystrokes back, with an extra-keys row for what phone keyboards lack.
 class TerminalPage extends StatefulWidget {
-  final String addr, user;
-  const TerminalPage({super.key, required this.addr, required this.user});
+  final String name, ip, user;
+  const TerminalPage({super.key, required this.name, required this.ip, required this.user});
   @override
   State<TerminalPage> createState() => _TerminalPageState();
 }
@@ -22,6 +24,7 @@ class _TerminalPageState extends State<TerminalPage> {
   @override
   void initState() {
     super.initState();
+    Native.start('Connected to ${widget.name}');
     term.onOutput = (data) => _send(data);
     term.onResize = (w, h, pw, ph) { if (id > 0) Engine.shellResize(id, w, h); };
     WidgetsBinding.instance.addPostFrameCallback((_) => _open()); // open after layout so the PTY gets the real size
@@ -29,9 +32,16 @@ class _TerminalPageState extends State<TerminalPage> {
 
   Future<void> _open() async {
     final sw = Stopwatch()..start();
-    final r = await Engine.shellOpen(widget.addr, widget.user, term.viewWidth, term.viewHeight);
+    final pin = await Store.hostKey(widget.ip);
+    final r = await Engine.shellOpen('${widget.ip}:22', widget.user, pin, term.viewWidth, term.viewHeight);
     if (!mounted) { if (r > 0) Engine.shellClose(r); return; }
-    if (r < 0) { setState(() => status = 'failed: ${Engine.lastError()}'); return; }
+    if (r < 0) {
+      final err = Engine.lastError();
+      if (err.contains('HOSTKEY_CHANGED')) { _hostKeyChanged(Engine.lastHostKey()); return; }
+      setState(() => status = 'failed: $err');
+      return;
+    }
+    if (pin.isEmpty) await Store.setHostKey(widget.ip, Engine.lastHostKey()); // trust on first use
     id = r;
     Engine.shellResize(id, term.viewWidth, term.viewHeight); // the layout may have changed while connecting
     setState(() => status = 'connected in ${sw.elapsedMilliseconds} ms');
@@ -40,6 +50,19 @@ class _TerminalPageState extends State<TerminalPage> {
       if (b64.isNotEmpty) term.write(utf8.decode(base64.decode(b64), allowMalformed: true));
       if (!Engine.shellAlive(id)) { poll?.cancel(); setState(() => status = 'session ended'); }
     });
+  }
+
+  Future<void> _hostKeyChanged(String fp) async {
+    setState(() => status = 'host key changed');
+    final trust = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Host key changed'),
+        content: Text('${widget.name} presented a different SSH key than before (new: $fp). This is normal after reinstalling Tailscale or the Mac, but it could also mean someone is in the way. Trust the new key?'),
+        actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('No')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Trust new key'))],
+      ),
+    );
+    if (trust == true) { await Store.setHostKey(widget.ip, fp); setState(() => status = 'connecting...'); _open(); }
   }
 
   void _send(String data) {
@@ -63,6 +86,7 @@ class _TerminalPageState extends State<TerminalPage> {
 
   @override
   void dispose() {
+    Native.stop();
     poll?.cancel();
     if (id > 0) Engine.shellClose(id);
     super.dispose();
@@ -70,7 +94,7 @@ class _TerminalPageState extends State<TerminalPage> {
 
   @override
   Widget build(BuildContext c) => Scaffold(
-        appBar: AppBar(title: Text('${widget.user}@${widget.addr}', style: const TextStyle(fontSize: 14)), actions: [Padding(padding: const EdgeInsets.all(12), child: Text(status, key: const Key('tstatus'), style: const TextStyle(fontSize: 12)))]),
+        appBar: AppBar(title: Text('${widget.user}@${widget.name}', style: const TextStyle(fontSize: 14)), actions: [Padding(padding: const EdgeInsets.all(12), child: Text(status, key: const Key('tstatus'), style: const TextStyle(fontSize: 12)))]),
         body: SafeArea(
           child: Column(children: [
             Expanded(child: TerminalView(term, autofocus: true, textStyle: const TerminalStyle(fontSize: 13))),

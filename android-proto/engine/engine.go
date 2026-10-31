@@ -95,7 +95,19 @@ func rw_state() *C.char {
 	for _, ip := range st.TailscaleIPs {
 		ips = append(ips, ip.String())
 	}
-	b, _ := json.Marshal(map[string]any{"state": st.BackendState, "authUrl": st.AuthURL, "ips": ips})
+	type peer struct {
+		Name   string `json:"name"`
+		IP     string `json:"ip"`
+		OS     string `json:"os"`
+		Online bool   `json:"online"`
+	}
+	peers := []peer{}
+	for _, p := range st.Peer {
+		if len(p.TailscaleIPs) > 0 {
+			peers = append(peers, peer{p.HostName, p.TailscaleIPs[0].String(), p.OS, p.Online})
+		}
+	}
+	b, _ := json.Marshal(map[string]any{"state": st.BackendState, "authUrl": st.AuthURL, "ips": ips, "peers": peers})
 	return C.CString(string(b))
 }
 
@@ -152,7 +164,11 @@ var (
 	shells  = map[int]*shell{}
 	nextID  = 1
 	lastErr string
+	lastKey string
 )
+
+//export rw_last_hostkey
+func rw_last_hostkey() *C.char { mu.Lock(); defer mu.Unlock(); return C.CString(lastKey) }
 
 func fail(err error) C.int { mu.Lock(); lastErr = err.Error(); mu.Unlock(); return -1 }
 
@@ -160,7 +176,7 @@ func fail(err error) C.int { mu.Lock(); lastErr = err.Error(); mu.Unlock(); retu
 func rw_last_error() *C.char { mu.Lock(); defer mu.Unlock(); return C.CString(lastErr) }
 
 //export rw_shell_open
-func rw_shell_open(addr, user *C.char, cols, rows C.int) C.int {
+func rw_shell_open(addr, user, pinned *C.char, cols, rows C.int) C.int {
 	mu.Lock()
 	s := srv
 	mu.Unlock()
@@ -174,7 +190,18 @@ func rw_shell_open(addr, user *C.char, cols, rows C.int) C.int {
 		return fail(fmt.Errorf("dial: %w", err))
 	}
 	c, chans, reqs, err := ssh.NewClientConn(conn, C.GoString(addr), &ssh.ClientConfig{
-		User: C.GoString(user), HostKeyCallback: ssh.InsecureIgnoreHostKey(), Timeout: 30 * time.Second, // ponytail: pin host key
+		User: C.GoString(user), Timeout: 30 * time.Second,
+		// trust on first use: the app stores the fingerprint it saw (rw_last_hostkey) and passes it back as `pinned`
+		HostKeyCallback: func(_ string, _ net.Addr, k ssh.PublicKey) error {
+			fp := ssh.FingerprintSHA256(k)
+			mu.Lock()
+			lastKey = fp
+			mu.Unlock()
+			if pin := C.GoString(pinned); pin != "" && pin != fp {
+				return fmt.Errorf("HOSTKEY_CHANGED")
+			}
+			return nil
+		},
 	})
 	if err != nil {
 		return fail(fmt.Errorf("ssh: %w", err))

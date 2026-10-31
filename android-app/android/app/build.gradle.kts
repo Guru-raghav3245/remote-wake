@@ -1,8 +1,12 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+val keyProps = Properties().apply { file("../key.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) } }
 
 android {
     namespace = "com.guru.remote_wake_app"
@@ -29,11 +33,19 @@ android {
         versionName = flutter.versionName
     }
 
+    // release key lives outside the repo (~/.remote-wake-android.jks, details in the gitignored android/key.properties)
+    signingConfigs {
+        if (keyProps.isNotEmpty()) create("release") {
+            storeFile = file(keyProps["storeFile"] as String)
+            storePassword = keyProps["storePassword"] as String
+            keyAlias = keyProps["keyAlias"] as String
+            keyPassword = keyProps["keyPassword"] as String
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 }

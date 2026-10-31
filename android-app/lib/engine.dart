@@ -23,14 +23,17 @@ String _exec(String addr, String user, String cmd) {
   return using((a) => _take(f(addr.toNativeUtf8(allocator: a), user.toNativeUtf8(allocator: a), cmd.toNativeUtf8(allocator: a))));
 }
 
-int _shellOpen(String addr, String user, int cols, int rows) {
-  final f = _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Pointer<Utf8>, Int32, Int32), int Function(Pointer<Utf8>, Pointer<Utf8>, int, int)>('rw_shell_open');
-  return using((a) => f(addr.toNativeUtf8(allocator: a), user.toNativeUtf8(allocator: a), cols, rows));
+int _shellOpen(String addr, String user, String pinned, int cols, int rows) {
+  final f = _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Int32, Int32),
+      int Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, int, int)>('rw_shell_open');
+  return using((a) => f(addr.toNativeUtf8(allocator: a), user.toNativeUtf8(allocator: a), pinned.toNativeUtf8(allocator: a), cols, rows));
 }
 
 class Engine {
   // Interactive shell with a PTY. open() blocks (dial + SSH handshake) so it runs off the UI isolate; the rest are quick buffer operations.
-  static Future<int> shellOpen(String addr, String user, int cols, int rows) => Isolate.run(() => _shellOpen(addr, user, cols, rows));
+  static Future<int> shellOpen(String addr, String user, String pinned, int cols, int rows) => Isolate.run(() => _shellOpen(addr, user, pinned, cols, rows));
+  static String lastHostKey() =>
+      _take(_lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>('rw_last_hostkey')());
   static String lastError() =>
       _take(_lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>('rw_last_error')());
   static String shellRead(int id) => _take(_lib.lookupFunction<Pointer<Utf8> Function(Int32), Pointer<Utf8> Function(int)>('rw_shell_read')(id));
