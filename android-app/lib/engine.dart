@@ -23,7 +23,24 @@ String _exec(String addr, String user, String cmd) {
   return using((a) => _take(f(addr.toNativeUtf8(allocator: a), user.toNativeUtf8(allocator: a), cmd.toNativeUtf8(allocator: a))));
 }
 
+int _shellOpen(String addr, String user, int cols, int rows) {
+  final f = _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Pointer<Utf8>, Int32, Int32), int Function(Pointer<Utf8>, Pointer<Utf8>, int, int)>('rw_shell_open');
+  return using((a) => f(addr.toNativeUtf8(allocator: a), user.toNativeUtf8(allocator: a), cols, rows));
+}
+
 class Engine {
+  // Interactive shell with a PTY. open() blocks (dial + SSH handshake) so it runs off the UI isolate; the rest are quick buffer operations.
+  static Future<int> shellOpen(String addr, String user, int cols, int rows) => Isolate.run(() => _shellOpen(addr, user, cols, rows));
+  static String lastError() =>
+      _take(_lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>('rw_last_error')());
+  static String shellRead(int id) => _take(_lib.lookupFunction<Pointer<Utf8> Function(Int32), Pointer<Utf8> Function(int)>('rw_shell_read')(id));
+  static bool shellAlive(int id) => _lib.lookupFunction<Int32 Function(Int32), int Function(int)>('rw_shell_alive')(id) == 1;
+  static void shellWrite(int id, String b64) => using((a) => _lib
+      .lookupFunction<Void Function(Int32, Pointer<Utf8>), void Function(int, Pointer<Utf8>)>('rw_shell_write')(id, b64.toNativeUtf8(allocator: a)));
+  static void shellResize(int id, int cols, int rows) =>
+      _lib.lookupFunction<Void Function(Int32, Int32, Int32), void Function(int, int, int)>('rw_shell_resize')(id, cols, rows);
+  static void shellClose(int id) => _lib.lookupFunction<Void Function(Int32), void Function(int)>('rw_shell_close')(id);
+
   static String start(String dir, {String authKey = ''}) => _start(dir, authKey);
   static Map<String, dynamic> state() => jsonDecode(_state()) as Map<String, dynamic>;
   // blocking Go calls run off the UI isolate

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'engine.dart';
+import 'terminal_page.dart';
 
 void main() => runApp(const MaterialApp(home: Home()));
 
@@ -62,7 +63,11 @@ class _HomeState extends State<Home> {
         TextField(controller: user, decoration: const InputDecoration(labelText: 'User')),
         TextField(controller: cmd, decoration: const InputDecoration(labelText: 'Command')),
         const SizedBox(height: 8),
-        FilledButton(onPressed: ready && !busy ? _run : null, child: const Text('Run')),
+        Row(children: [
+          Expanded(child: FilledButton(onPressed: ready && !busy ? _run : null, child: const Text('Run'))),
+          const SizedBox(width: 8),
+          Expanded(child: FilledButton.tonal(onPressed: ready ? () => Navigator.of(c).push(MaterialPageRoute(builder: (_) => TerminalPage(addr: host.text, user: user.text))) : null, child: const Text('Open terminal'))),
+        ]),
         const SizedBox(height: 12),
         SelectableText(out, key: const Key('out'), style: const TextStyle(fontFamily: 'monospace')),
       ]),

@@ -13,8 +13,10 @@ import "C"
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 	"unsafe"
@@ -134,3 +136,141 @@ func rw_exec(addr, user, cmd *C.char) *C.char {
 func rw_free(p *C.char) { C.free(unsafe.Pointer(p)) }
 
 func main() {}
+
+// ---- interactive shell ----
+
+type shell struct {
+	cl   *ssh.Client
+	sess *ssh.Session
+	in   io.WriteCloser
+	mu   sync.Mutex
+	buf  []byte
+	done bool
+}
+
+var (
+	shells  = map[int]*shell{}
+	nextID  = 1
+	lastErr string
+)
+
+func fail(err error) C.int { mu.Lock(); lastErr = err.Error(); mu.Unlock(); return -1 }
+
+//export rw_last_error
+func rw_last_error() *C.char { mu.Lock(); defer mu.Unlock(); return C.CString(lastErr) }
+
+//export rw_shell_open
+func rw_shell_open(addr, user *C.char, cols, rows C.int) C.int {
+	mu.Lock()
+	s := srv
+	mu.Unlock()
+	if s == nil {
+		return fail(fmt.Errorf("not started"))
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	conn, err := s.Dial(ctx, "tcp", C.GoString(addr))
+	if err != nil {
+		return fail(fmt.Errorf("dial: %w", err))
+	}
+	c, chans, reqs, err := ssh.NewClientConn(conn, C.GoString(addr), &ssh.ClientConfig{
+		User: C.GoString(user), HostKeyCallback: ssh.InsecureIgnoreHostKey(), Timeout: 30 * time.Second, // ponytail: pin host key
+	})
+	if err != nil {
+		return fail(fmt.Errorf("ssh: %w", err))
+	}
+	cl := ssh.NewClient(c, chans, reqs)
+	sess, err := cl.NewSession()
+	if err != nil {
+		cl.Close()
+		return fail(err)
+	}
+	if err := sess.RequestPty("xterm-256color", int(rows), int(cols), ssh.TerminalModes{ssh.ECHO: 1}); err != nil {
+		cl.Close()
+		return fail(err)
+	}
+	in, _ := sess.StdinPipe()
+	out, _ := sess.StdoutPipe() // with a PTY the remote merges stderr into stdout
+	if err := sess.Shell(); err != nil {
+		cl.Close()
+		return fail(err)
+	}
+	sh := &shell{cl: cl, sess: sess, in: in}
+	go func() {
+		b := make([]byte, 32*1024)
+		for {
+			n, err := out.Read(b)
+			sh.mu.Lock()
+			sh.buf = append(sh.buf, b[:n]...)
+			if err != nil {
+				sh.done = true
+			}
+			sh.mu.Unlock()
+			if err != nil {
+				return
+			}
+		}
+	}()
+	mu.Lock()
+	id := nextID
+	nextID++
+	shells[id] = sh
+	mu.Unlock()
+	return C.int(id)
+}
+
+func getShell(id C.int) *shell { mu.Lock(); defer mu.Unlock(); return shells[int(id)] }
+
+//export rw_shell_read
+func rw_shell_read(id C.int) *C.char {
+	sh := getShell(id)
+	if sh == nil {
+		return C.CString("")
+	}
+	sh.mu.Lock()
+	b := sh.buf
+	sh.buf = nil
+	sh.mu.Unlock()
+	return C.CString(base64.StdEncoding.EncodeToString(b))
+}
+
+//export rw_shell_alive
+func rw_shell_alive(id C.int) C.int {
+	sh := getShell(id)
+	if sh == nil {
+		return 0
+	}
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+	if sh.done && len(sh.buf) == 0 {
+		return 0
+	}
+	return 1
+}
+
+//export rw_shell_write
+func rw_shell_write(id C.int, b64 *C.char) {
+	if sh := getShell(id); sh != nil {
+		if b, err := base64.StdEncoding.DecodeString(C.GoString(b64)); err == nil {
+			sh.in.Write(b)
+		}
+	}
+}
+
+//export rw_shell_resize
+func rw_shell_resize(id, cols, rows C.int) {
+	if sh := getShell(id); sh != nil {
+		sh.sess.WindowChange(int(rows), int(cols))
+	}
+}
+
+//export rw_shell_close
+func rw_shell_close(id C.int) {
+	mu.Lock()
+	sh := shells[int(id)]
+	delete(shells, int(id))
+	mu.Unlock()
+	if sh != nil {
+		sh.cl.Close()
+	}
+}
