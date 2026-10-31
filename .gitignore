@@ -17,3 +17,4 @@ cloud/vercel/.agents/
 cloud/vercel/.claude/
 server.py
 poll_server.py
+app/vendor/

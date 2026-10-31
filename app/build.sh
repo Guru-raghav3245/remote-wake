@@ -3,7 +3,8 @@
 set -e; cd "$(dirname "$0")"
 A="build/Remote Wake.app"; rm -rf build; mkdir -p "$A/Contents/MacOS"
 swiftc -O -parse-as-library -o "$A/Contents/MacOS/RemoteWake" RemoteWakeMenu.swift
-mkdir -p "$A/Contents/Resources/agent"; cp ../agent/wakeagent.py ../agent/install.sh ../agent/uninstall.sh "$A/Contents/Resources/agent/"
+mkdir -p "$A/Contents/Resources/agent"; cp ../agent/tailscale-install.sh ../agent/stayawake-install.sh ../agent/stayawake-uninstall.sh ../agent/com.guru.stayawake.plist "$A/Contents/Resources/agent/"
+[ -d vendor/tailscale ] && cp -R vendor/tailscale "$A/Contents/Resources/tailscale" || echo "note: no vendor/tailscale (run ./build-tailscale.sh); app will not bundle Tailscale"
 cat > "$A/Contents/Info.plist" <<P
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -20,7 +21,7 @@ P
 codesign --force -s - "$A"
 rm -f "Remote Wake.dmg" build/rw.dmg
 swift make_bg.swift build/bg.png
-hdiutil create -quiet -size 20m -fs HFS+ -volname "Remote Wake" -ov build/rw.dmg
+hdiutil create -quiet -size 250m -fs HFS+ -volname "Remote Wake" -ov build/rw.dmg
 MNT=$(hdiutil attach -nobrowse build/rw.dmg | sed -n 's/.*\(\/Volumes\/.*\)/\1/p')
 cp -R "$A" "$MNT/"; ln -s /Applications "$MNT/Applications"
 mkdir "$MNT/.background"; cp build/bg.png "$MNT/.background/bg.png"
