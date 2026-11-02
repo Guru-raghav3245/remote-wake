@@ -34,10 +34,13 @@ class Engine {
   static Future<int> shellOpen(String addr, String user, String pinned, int cols, int rows) => Isolate.run(() => _shellOpen(addr, user, pinned, cols, rows));
   static String lastHostKey() =>
       _take(_lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>('rw_last_hostkey')());
+  static String lastBanner() =>
+      _take(_lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>('rw_last_banner')());
   static String lastError() =>
       _take(_lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>('rw_last_error')());
   static String shellRead(int id) => _take(_lib.lookupFunction<Pointer<Utf8> Function(Int32), Pointer<Utf8> Function(int)>('rw_shell_read')(id));
   static bool shellAlive(int id) => _lib.lookupFunction<Int32 Function(Int32), int Function(int)>('rw_shell_alive')(id) == 1;
+  static bool shellDropped(int id) => _lib.lookupFunction<Int32 Function(Int32), int Function(int)>('rw_shell_dropped')(id) == 1;
   static void shellWrite(int id, String b64) => using((a) => _lib
       .lookupFunction<Void Function(Int32, Pointer<Utf8>), void Function(int, Pointer<Utf8>)>('rw_shell_write')(id, b64.toNativeUtf8(allocator: a)));
   static void shellResize(int id, int cols, int rows) =>

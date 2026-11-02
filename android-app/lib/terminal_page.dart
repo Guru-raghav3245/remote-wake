@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:xterm/xterm.dart';
 import 'engine.dart';
 import 'native.dart';
@@ -20,6 +21,10 @@ class _TerminalPageState extends State<TerminalPage> {
   String status = 'connecting...';
   bool ctrl = false;
   Timer? poll;
+  bool reconnecting = false, gaveUp = false;
+  int attempt = 0;
+  String? seenUrl; // the engine keeps the last banner; only a NEW link means a new approval is needed
+  String? approveUrl; // Tailscale "check" policy: the Mac asks for a browser approval (link arrives as the SSH banner)
 
   @override
   void initState() {
@@ -33,23 +38,52 @@ class _TerminalPageState extends State<TerminalPage> {
   Future<void> _open() async {
     final sw = Stopwatch()..start();
     final pin = await Store.hostKey(widget.ip);
+    final bt = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      final b = Engine.lastBanner();
+      final m = RegExp(r'https://\S+').firstMatch(b);
+      if (m != null && seenUrl != m.group(0)) { debugPrint('APPROVEURL ${m.group(0)}'); seenUrl = m.group(0); setState(() { approveUrl = m.group(0); status = 'waiting for approval'; }); }
+    });
     final r = await Engine.shellOpen('${widget.ip}:22', widget.user, pin, term.viewWidth, term.viewHeight);
+    bt.cancel();
     if (!mounted) { if (r > 0) Engine.shellClose(r); return; }
+    if (approveUrl != null) setState(() => approveUrl = null);
     if (r < 0) {
       final err = Engine.lastError();
       if (err.contains('HOSTKEY_CHANGED')) { _hostKeyChanged(Engine.lastHostKey()); return; }
-      setState(() => status = 'failed: $err');
+      if (!reconnecting) setState(() => status = 'failed: $err');
       return;
     }
     if (pin.isEmpty) await Store.setHostKey(widget.ip, Engine.lastHostKey()); // trust on first use
     id = r;
     Engine.shellResize(id, term.viewWidth, term.viewHeight); // the layout may have changed while connecting
+    if (reconnecting) term.write('\r\n[reconnected: new shell, earlier programs were stopped]\r\n');
+    reconnecting = false; gaveUp = false; attempt = 0;
     setState(() => status = 'connected in ${sw.elapsedMilliseconds} ms');
     poll = Timer.periodic(const Duration(milliseconds: 40), (_) {
       final b64 = Engine.shellRead(id);
       if (b64.isNotEmpty) term.write(utf8.decode(base64.decode(b64), allowMalformed: true));
-      if (!Engine.shellAlive(id)) { poll?.cancel(); setState(() => status = 'session ended'); }
+      if (!Engine.shellAlive(id)) {
+        poll?.cancel();
+        final dropped = Engine.shellDropped(id);
+        Engine.shellClose(id);
+        id = -1;
+        if (dropped) { _reconnect(); } else { setState(() => status = 'session ended'); }
+      }
     });
+  }
+
+  // The connection dropped: keep the screen, retry with a growing pause (2,4,8,15 s ...), give up after 10 tries (button to retry).
+  Future<void> _reconnect() async {
+    reconnecting = true; gaveUp = false;
+    while (mounted && attempt < 10) {
+      attempt++;
+      setState(() => status = 'reconnecting (try $attempt)...');
+      await Future.delayed(Duration(seconds: [2, 4, 8, 15][(attempt - 1).clamp(0, 3)]));
+      if (!mounted) return;
+      await _open();
+      if (id > 0) return; // _open sets id on success
+    }
+    if (mounted) setState(() { gaveUp = true; status = 'disconnected'; });
   }
 
   Future<void> _hostKeyChanged(String fp) async {
@@ -97,6 +131,30 @@ class _TerminalPageState extends State<TerminalPage> {
         appBar: AppBar(title: Text('${widget.user}@${widget.name}', style: const TextStyle(fontSize: 14)), actions: [Padding(padding: const EdgeInsets.all(12), child: Text(status, key: const Key('tstatus'), style: const TextStyle(fontSize: 12)))]),
         body: SafeArea(
           child: Column(children: [
+            if (approveUrl != null)
+              Material(
+                color: Theme.of(c).colorScheme.tertiaryContainer,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  child: Row(children: [
+                    const Expanded(child: Text('Tailscale needs you to approve this connection (about every 12 hours).', key: Key('approve'))),
+                    FilledButton(onPressed: () => launchUrl(Uri.parse(approveUrl!), mode: LaunchMode.externalApplication), child: const Text('Approve')),
+                  ]),
+                ),
+              ),
+            if (reconnecting)
+              Material(
+                color: Theme.of(c).colorScheme.errorContainer,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  child: Row(children: [
+                    if (!gaveUp) const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(gaveUp ? 'Connection lost' : 'Connection lost, reconnecting...', key: const Key('banner'))),
+                    if (gaveUp) TextButton(onPressed: () { attempt = 0; _reconnect(); }, child: const Text('Retry')),
+                  ]),
+                ),
+              ),
             Expanded(child: TerminalView(term, autofocus: true, textStyle: const TerminalStyle(fontSize: 13))),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
