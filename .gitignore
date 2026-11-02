@@ -18,3 +18,6 @@ cloud/vercel/.claude/
 server.py
 poll_server.py
 app/vendor/
+
+# private notes with personal details (IPs, accounts); Claude Code reads it locally
+CLAUDE.local.md
