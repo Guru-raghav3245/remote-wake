@@ -31,6 +31,7 @@ func tsPath() -> String? { ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tails
     @Published var tsState = ""        // Running, NeedsLogin, Stopped, ... or "not installed"
     @Published var tsIP = ""
     @Published var authURL: String?
+    @Published var phones: [String] = []   // Android devices already on the tailnet (name, with " (offline)" if so)
     @Published var busy = false
     @Published var error: String?
     var timer: Timer?
@@ -47,6 +48,8 @@ func tsPath() -> String? { ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tails
         let j = (try? JSONSerialization.jsonObject(with: Data(run(ts, ["status", "--json"]).out.utf8))) as? [String: Any]
         tsState = j?["BackendState"] as? String ?? "daemon not running"
         authURL = (j?["AuthURL"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let peers = (j?["Peer"] as? [String: [String: Any]])?.values.filter { ($0["OS"] as? String) == "android" } ?? []
+        phones = peers.map { ($0["HostName"] as? String ?? "phone") + (($0["Online"] as? Bool) == true ? "" : " (offline)") }.sorted { ($0.hasSuffix("(offline)") ? 1 : 0, $0) < ($1.hasSuffix("(offline)") ? 1 : 0, $1) }  // online first
         tsIP = ((j?["Self"] as? [String: Any])?["TailscaleIPs"] as? [String])?.first ?? ""
     }
 
@@ -111,6 +114,19 @@ struct Panel: View {
                     Button("Sign in to Tailscale") { NSWorkspace.shared.open(url) }
                 } else if m.tsState != "Running" {
                     Button("Connect Tailscale") { m.connect() }
+                }
+            }
+            if m.tsState == "Running" {
+                Divider()
+                if let ph = m.phones.first {
+                    Row(k: "Phone", v: ph)
+                } else {
+                    Text("Next: set up your phone").font(.headline)
+                    Text("1. Copy the phone app to your Android phone (cable, Drive, or email it to yourself) and open it; allow installs from that source.\n2. Open Remote Wake there and sign in to Tailscale with the same account as this Mac.\n3. Tap this Mac in the list.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    if let apk = Bundle.main.url(forResource: "RemoteWake", withExtension: "apk") {
+                        Button("Show phone app in Finder") { NSWorkspace.shared.activateFileViewerSelecting([apk]) }
+                    }
                 }
             }
             if let e = m.error { Text(e).font(.caption).foregroundStyle(.red) }

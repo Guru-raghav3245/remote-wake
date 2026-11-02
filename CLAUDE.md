@@ -152,3 +152,8 @@ Question: can a phone app embed the Tailscale engine (no VpnService, no root) an
 - Mistake to avoid: my first deadline edit landed in `rw_exec`, not `rw_shell_open`, because `str.replace` hit the first match; check `git diff` after scripted edits.
 - NOT tested on the real phone: reconnect, the Approve button with a real signed-in browser. The release APK in `~/Downloads/RemoteWake.apk` has all of this; the phone was not connected over USB when built, so reinstall it (`adb install -r`).
 
+### Mac app first-run phone hint (2 Nov 2026) — built, panel not seen on screen
+- `app/RemoteWakeMenu.swift`: once Tailscale is Running, the panel shows "Next: set up your phone" (3 steps: copy the APK to the Android phone, sign in to Tailscale with the same account, tap this Mac) and a "Show phone app in Finder" button that reveals the bundled APK. As soon as an Android node exists in `tailscale status` (peer `OS == android`) it shows a "Phone" row with its name instead (online first, "(offline)" if so). On the user's Mac that is always the Phone row because old test nodes exist, so the steps view could not be seen; only the parsing and the APK in the DMG were checked.
+- `app/build.sh` bundles `android-app/build/app/outputs/flutter-apk/app-release.apk` as `Resources/RemoteWake.apk` (build the APK first; the script only prints a note if it is missing). DMG now about 54 MB. `~/Downloads/Remote Wake.dmg` updated.
+- Not done: the APK is not signed with anything beyond our own keystore, Play Protect on the phone may warn on sideload; no QR code / link (repo is private); iPhone has no equivalent.
+
