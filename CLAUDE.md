@@ -13,8 +13,8 @@ Remind them at the start of any session that touches this project until it's don
 - Never commit, upload or print `AuthKey_L72JVD5GGR.p8`. It stays on the Mac and the sender VM only (`chmod 600`).
 - `.xcodeproj` is generated: edit `project.yml`, then run `xcodegen generate`.
 
-## Sender VM (Test 1 to 3 probe) — deletion pending the user
-GCP project `<gcp-project>` (VM `wakeprobe-sender`, firewall rules `wakeprobe-9000`, `wakeprobe-9001`) still exists: the auto-mode classifier blocked Claude from deleting it on 2 Nov 2026. The user must run `! gcloud projects delete <gcp-project>` themselves (removes VM and rules; recoverable for 30 days). Remind them until it is gone, then delete this section. The `.p8` key still lives on this Mac.
+## Sender VM (Test 1 to 3 probe) — GCP project DELETED (2 Nov 2026)
+The user deleted GCP project `<gcp-project>` (VM and firewall rules included). It shows `DELETE_REQUESTED` and Google removes it for good after 30 days (about 2 Dec 2026); `gcloud projects undelete <gcp-project>` restores it until then. Nothing else to do. The `.p8` key is still on this Mac (revoke it in the Apple portal).
 
 ## Test 2 (inbound packet wake)
 `server.py` runs on the VM (port 9000, firewall rule `wakeprobe-9000` limited to the user's public IP <home-ip>; update it if the Mac's network changes). `client.py` runs on the Mac (`nohup python3 client.py &`). Trials: `./trial2.sh <row> <delay-min>`, then `./collect2.sh`. Results in `trials2.log`.
