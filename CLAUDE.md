@@ -157,3 +157,6 @@ Question: can a phone app embed the Tailscale engine (no VpnService, no root) an
 - `app/build.sh` bundles `android-app/build/app/outputs/flutter-apk/app-release.apk` as `Resources/RemoteWake.apk` (build the APK first; the script only prints a note if it is missing). DMG now about 54 MB. `~/Downloads/Remote Wake.dmg` updated.
 - Not done: the APK is not signed with anything beyond our own keystore, Play Protect on the phone may warn on sideload; no QR code / link (repo is private); iPhone has no equivalent.
 
+### Spec rewritten (2 Nov 2026)
+`Remote Wake for Mac Product Spec v3.md` describes the current design (stay awake on AC, bundled Tailscale + SSH, Android app, what is validated, risks, costs, open decisions, cleanup). The old `... Spec v2.md` (wake loop + cloud) is kept untouched for history; `... v2.0 (backup).md` too. The tailnet's SSH policy lists `root` as an allowed user (seen in `tailscale debug netmap`): the app only offers the user typed in, but tighten the rule if that matters.
+
