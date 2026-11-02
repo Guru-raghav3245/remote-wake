@@ -1,1 +1,0 @@
-{ "name": "remote-wake-cloud", "private": true, "type": "module", "scripts": { "dev": "ADMIN_TOKEN=testadmin EXPIRY_S=3 node dev.js" } }

@@ -24,7 +24,7 @@ v1 and v2 tried to wake a sleeping Mac. The feasibility tests (Tests 1 to 5, 27 
 | Keep the Mac awake on AC | `caffeinate -s` holds the Mac awake with the lid closed, only while on AC. Short tests passed (section 8) | **The core of v3** |
 | A cloud service reaches the Mac | Not needed: Tailscale gives each device a private address and a direct or relayed path | Tailscale replaces the cloud service |
 
-The old cloud design (Vercel, Upstash, pairing codes, the PWA, the check-in agent) is built, still deployed and still in the repository, but unused. Whether to remove it is an open decision (section 12).
+The old cloud design (Vercel, Upstash, pairing codes, the PWA, the check-in agent) was built and then removed on 2 Nov 2026. It stays in git history (last commit with it: `d5eb0f2`).
 
 ## 3. How it works
 
@@ -137,7 +137,6 @@ Everything above costs nothing today. These would cost money, so ask before doin
 
 ## 12. Open decisions
 
-- **Old cloud design** (`cloud/`, the Vercel and Upstash deployment, the GCP test VM and project, `agent/wakeagent.py`, the old PWA): superseded. Remove it or keep it as a fallback for a possible "wake" feature? Not deleted. Ask the user before any removal.
 - **Tailnet SSH policy:** keep "check" (safer, a prompt about every 12 hours) or switch to "accept".
 - **Distribution:** whether and when to pay for Developer ID, the Play Store, or an iPhone app.
 - **A second Mac or second user:** not designed. One Tailscale account per owner.
@@ -147,7 +146,7 @@ Everything above costs nothing today. These would cost money, so ask before doin
 - Pending tests: the overnight soak test, FileVault and power-loss, the 10-minute lid-closed run, the real-phone checks in section 9.
 - Switch Xcode back to the personal Apple account (Xcode > Settings > Accounts).
 - Revoke the APNs key `wakeprobe apns` in the developer portal.
-- Delete the GCP test project `<gcp-project>` (VM and firewall rules) after the overnight test, with the owner's explicit OK.
+- Delete the GCP test project `<gcp-project>` (VM and firewall rules): the owner runs `gcloud projects delete <gcp-project>` (the assistant's attempt was blocked).
 - Turn Power Nap back on: `sudo pmset -a powernap 1`.
 - Delete the stale Tailscale nodes (`rw-phone`, `rw-phone-1`) in the admin console.
 - Back up `~/.remote-wake-android.jks`.
