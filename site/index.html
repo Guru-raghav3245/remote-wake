@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Remote Wake: reach your Mac from your phone</title>
+<meta name="description" content="Keep your plugged-in Mac awake with the lid closed and open a terminal on it from your Android phone. Free, private, powered by Tailscale.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+@font-face{font-family:Figtree;src:url(/fonts/Figtree.ttf) format("truetype");font-weight:300 900;font-display:swap}
+:root{
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--s8:80px;
+  --bg:#EEF2EC;--card:#F8FAF6;--soft:#DDE7DA;--line:#D3DCCF;--text:#2F3A33;--muted:#5E6B61;--accent:#4F7A5A;--on:#FFFFFF;
+  --warn:#7A5A12;--warnbg:#F6EBD3;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#151B17;--card:#1D2520;--soft:#24302A;--line:#2E3A33;--text:#E4EBE5;--muted:#9BAB9F;--accent:#8FBF9A;--on:#11201A;--warn:#E5C57A;--warnbg:#2B2616}}
+:root[data-theme=dark]{--bg:#151B17;--card:#1D2520;--soft:#24302A;--line:#2E3A33;--text:#E4EBE5;--muted:#9BAB9F;--accent:#8FBF9A;--on:#11201A;--warn:#E5C57A;--warnbg:#2B2616}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:400 17px/1.55 Figtree,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.wrap{max-width:1040px;margin:0 auto;padding:0 var(--s5)}
+h1,h2,h3{margin:0;line-height:1.1;font-weight:700;letter-spacing:-.01em}
+h1{font-size:clamp(40px,7vw,64px)}
+h2{font-size:clamp(28px,4vw,36px)}
+h3{font-size:19px;line-height:1.3;font-weight:600}
+p{margin:0}
+.muted{color:var(--muted)}
+.skip{position:absolute;left:-999px}.skip:focus{left:var(--s4);top:var(--s4);background:var(--card);padding:var(--s2) var(--s4);border-radius:8px;z-index:9}
+
+/* nav */
+nav{display:flex;align-items:center;gap:var(--s5);padding:var(--s4) 0}
+.brand{display:flex;align-items:center;gap:var(--s3);font-weight:700;font-size:19px;text-decoration:none}
+.logo{width:36px;height:36px;border-radius:11px;background:var(--accent);display:grid;place-items:center}
+.logo svg{width:20px;height:20px;fill:var(--on)}
+nav .links{margin-left:auto;display:flex;gap:var(--s5);align-items:center}
+nav .links a{text-decoration:none;color:var(--muted);font-weight:500;font-size:15px}
+nav .links a:hover{color:var(--text)}
+#theme{width:44px;height:44px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer;display:grid;place-items:center}
+#theme svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+@media(max-width:640px){nav .links a{display:none}}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);height:48px;padding:0 var(--s5);border-radius:999px;font:600 16px Figtree,sans-serif;text-decoration:none;border:1px solid var(--line);color:var(--text);background:transparent;cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--on);border-color:transparent}
+.btn:hover{filter:brightness(1.06)}
+.btn:focus-visible,#theme:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+/* hero */
+.hero{padding:var(--s8) 0 var(--s7);display:grid;gap:var(--s6);justify-items:start}
+.hero p.lead{font-size:20px;color:var(--muted);max-width:34ch}
+.ctas{display:flex;flex-wrap:wrap;gap:var(--s3)}
+.facts{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5);font-size:14px;color:var(--muted)}
+.facts span:before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:var(--s2)}
+
+/* sections */
+section{padding:var(--s7) 0}
+.head{display:grid;gap:var(--s3);margin-bottom:var(--s6);max-width:56ch}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:var(--s5)}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:var(--s4)}
+.num{width:32px;height:32px;border-radius:50%;background:var(--soft);display:grid;place-items:center;font-weight:700;font-size:15px;margin-bottom:var(--s4)}
+.card p{color:var(--muted);margin-top:var(--s2);font-size:16px}
+
+/* app mockups */
+.shots{display:flex;flex-wrap:wrap;gap:var(--s5);align-items:flex-start;justify-content:center;margin-top:var(--s6)}
+.mac{width:400px;max-width:100%;border:1px solid var(--line);border-radius:16px;background:var(--bg);overflow:hidden}
+.mac .bar{height:34px;background:var(--soft);display:flex;gap:7px;align-items:center;padding:0 var(--s3)}
+.mac .bar i{width:11px;height:11px;border-radius:50%;background:var(--line)}
+.mac .body{padding:var(--s5);display:grid;gap:var(--s4)}
+.mhead{display:flex;align-items:center;gap:var(--s3);font-weight:700;font-size:22px}
+.mhead .logo{width:32px;height:32px}
+.mini{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:var(--s4)}
+.mini.tint{background:var(--soft)}
+.row{display:flex;align-items:center;gap:var(--s3);min-height:32px;font-size:15px}
+.row .v{margin-left:auto;color:var(--muted)}
+.hr{height:1px;background:var(--line);margin:var(--s3) 0}
+.sw{width:44px;height:26px;border-radius:13px;background:var(--accent);position:relative;flex:none}
+.sw:after{content:"";position:absolute;right:3px;top:3px;width:20px;height:20px;border-radius:50%;background:var(--on)}
+.st{display:inline-flex;align-items:center;gap:var(--s2);font-size:13px;font-weight:600;color:var(--accent)}
+.st:before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.phone{width:260px;border:2px solid var(--line);border-radius:32px;background:var(--bg);padding:var(--s4);display:grid;gap:var(--s3)}
+.phone .t{display:flex;align-items:center;gap:var(--s3);font-weight:700;font-size:17px;padding:var(--s2) 0}
+.phone .logo{width:28px;height:28px;border-radius:9px}.phone .logo svg{width:16px;height:16px}
+.pc{display:flex;align-items:center;gap:var(--s3);background:var(--card);border:1px solid var(--line);border-radius:16px;padding:var(--s3)}
+.pc .ic{width:40px;height:40px;border-radius:12px;background:var(--soft);display:grid;place-items:center}
+.pc .ic svg{width:20px;height:20px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.pc b{display:block;font-size:16px;line-height:1.3}
+.term{background:#151B17;color:#E4EBE5;border-radius:12px;padding:var(--s3);font:13px/1.6 ui-monospace,Menlo,monospace}
+.keys{display:flex;gap:var(--s2);flex-wrap:wrap}
+.keys span{background:#24302A;color:#E4EBE5;border-radius:10px;padding:var(--s2) var(--s3);font-size:13px;font-weight:600}
+
+/* download */
+.dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--s4)}
+.dl .card{display:grid;gap:var(--s4);align-content:start}
+.dl ul{margin:0;padding-left:var(--s5);color:var(--muted);font-size:15px;display:grid;gap:var(--s2)}
+.sha{font:12px/1.5 ui-monospace,Menlo,monospace;color:var(--muted);word-break:break-all}
+.note{background:var(--warnbg);color:var(--warn);border-radius:12px;padding:var(--s4);font-size:15px;margin-top:var(--s4)}
+.note b{font-weight:700}
+
+/* faq + footer */
+details{border-top:1px solid var(--line);padding:var(--s4) 0}
+details:last-of-type{border-bottom:1px solid var(--line)}
+summary{cursor:pointer;font-weight:600;font-size:18px;list-style:none;display:flex;justify-content:space-between;gap:var(--s4);min-height:32px;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary:after{content:"+";color:var(--accent);font-size:24px;line-height:1}
+details[open] summary:after{content:"\2212"}
+details p{color:var(--muted);margin-top:var(--s3);max-width:62ch}
+footer{padding:var(--s7) 0;color:var(--muted);font-size:14px;display:grid;gap:var(--s3)}
+footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
+</style>
+</head>
+<body>
+<a class="skip" href="#download">Skip to downloads</a>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="/"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg></span>Remote Wake</a>
+    <div class="links">
+      <a href="#how">How it works</a><a href="#download">Download</a><a href="#faq">FAQ</a>
+      <button id="theme" aria-label="Switch between light and dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <h1>Let your Mac rest.<br>Stay connected.</h1>
+    <p class="lead">Keep your plugged-in Mac awake with the lid closed, and open a terminal on it from your Android phone, from anywhere.</p>
+    <div class="ctas">
+      <a class="btn primary" href="#download">Download</a>
+      <a class="btn" href="#how">See how it works</a>
+    </div>
+    <div class="facts"><span>Free</span><span>Private: no servers of ours</span><span>Open source</span></div>
+  </header>
+
+  <section id="how">
+    <div class="head"><h2>Three steps, about five minutes</h2><p class="muted">Each app walks you through it and ticks every step off for you.</p></div>
+    <div class="grid3">
+      <div class="card"><div class="num">1</div><h3>Set up your Mac</h3><p>Install Remote Wake, connect Tailscale (a free account) and turn on "Stay awake on AC". One password prompt.</p></div>
+      <div class="card"><div class="num">2</div><h3>Install the phone app</h3><p>Sideload the Android app and sign in to Tailscale with the same account.</p></div>
+      <div class="card"><div class="num">3</div><h3>Tap your Mac</h3><p>Your Mac shows up in the list. Type your user name and you are in a real terminal.</p></div>
+    </div>
+
+    <div class="shots" aria-label="What the apps look like">
+      <div class="mac" role="img" aria-label="The Mac app dashboard with the stay awake switch on">
+        <div class="bar"><i></i><i></i><i></i></div>
+        <div class="body">
+          <div class="mhead"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg></span>Remote Wake</div>
+          <div class="mini tint">
+            <div class="row"><div><b style="font-size:18px">Your Mac is staying awake</b><div class="muted" style="font-size:14px">Safe to close the lid while it is plugged in.</div></div><span class="sw" style="margin-left:auto"></span></div>
+            <div style="margin-top:var(--s3)"><span class="st">Awake</span></div>
+          </div>
+          <div class="mini">
+            <div class="row">Power<span class="v">Plugged in</span></div><div class="hr"></div>
+            <div class="row">Tailscale<span class="v">100.x.x.x</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="phone" role="img" aria-label="The Android app showing a Mac that is online">
+        <div class="t"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg></span>Remote Wake</div>
+        <div class="mini tint"><span class="st">Connected</span><div style="font-weight:700;font-size:18px;margin-top:var(--s2)">Tailscale is on</div></div>
+        <div class="muted" style="font-size:13px;font-weight:600">Your computers</div>
+        <div class="pc"><span class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="2"/><path d="M2 19h20"/></svg></span><div><b>my-macbook</b><span class="st">Online</span></div></div>
+        <div class="term">my-macbook ~ %<br>$ caffeinate -s<br><span style="color:#8FBF9A">connected in 0.3 s</span></div>
+        <div class="keys"><span>Esc</span><span>Tab</span><span>Ctrl</span><span>^C</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="head"><h2>Made for leaving your Mac behind</h2></div>
+    <div class="grid3">
+      <div class="card"><h3>Awake with the lid closed</h3><p>A small background service keeps the Mac running while it is plugged in. On battery it sleeps normally.</p></div>
+      <div class="card"><h3>Private by design</h3><p>Your phone and Mac talk directly over Tailscale. There is no Remote Wake account and no server of ours in the middle.</p></div>
+      <div class="card"><h3>A real terminal</h3><p>Full-screen programs, an extra keys row for Esc, Tab and Ctrl, and automatic reconnect when the network drops.</p></div>
+    </div>
+  </section>
+
+  <section id="download">
+    <div class="head"><h2>Download</h2><p class="muted">Version 0.1. Both downloads are free. You also need a free Tailscale account.</p></div>
+    <div class="dl">
+      <div class="card">
+        <h3>Remote Wake for Mac</h3>
+        <ul><li>Apple silicon Macs (M1 and newer), macOS 13 or later</li><li>Includes Tailscale, so nothing else to install</li></ul>
+        <a class="btn primary" id="dl-mac" href="https://github.com/Guru-raghav3245/remote-wake/releases/latest/download/Remote-Wake.dmg">Download for Mac (.dmg)</a>
+        <div class="sha">sha256 738e94875aacc855164a7d6222d14bc879b97945b9bf26ad9c257ba693dedd05</div>
+      </div>
+      <div class="card">
+        <h3>Remote Wake for Android</h3>
+        <ul><li>64-bit ARM Android phones (almost every phone sold in the last several years)</li><li>Installed from the file, not from the Play Store</li></ul>
+        <a class="btn primary" id="dl-apk" href="https://github.com/Guru-raghav3245/remote-wake/releases/latest/download/RemoteWake.apk">Download for Android (.apk)</a>
+        <div class="sha">sha256 070ed29ecdc7fd1d04c8747387e580511b18cff6b170741b396dd04a31672b26</div>
+      </div>
+    </div>
+    <div class="note"><b>Expect two warnings.</b> The apps are not yet signed with a paid developer certificate. On the Mac, right-click the app and choose Open the first time. On Android, allow installs from your browser, and tap "Install anyway" if Play Protect asks.</div>
+  </section>
+
+  <section id="faq">
+    <div class="head"><h2>Questions</h2></div>
+    <details><summary>Does my Mac stay awake on battery?</summary><p>No. It stays awake only while plugged in. On battery it sleeps like normal, which protects your battery.</p></details>
+    <details><summary>What is Tailscale and do I need an account?</summary><p>Tailscale makes the private link between your devices. You need a free account, and you sign in once on the Mac and once on the phone with the same account.</p></details>
+    <details><summary>Every so often my phone asks me to approve a connection.</summary><p>That is Tailscale's safety check, about every 12 hours. The app shows an Approve button that opens the approval page.</p></details>
+    <details><summary>What if the connection drops?</summary><p>The app reconnects by itself, but programs that were running in the terminal stop. Run long jobs inside tmux on the Mac to keep them alive.</p></details>
+    <details><summary>What happens after a power cut?</summary><p>If FileVault is on, the Mac waits for its password at startup, and nothing can reach it until someone unlocks it.</p></details>
+    <details><summary>Is there an iPhone app?</summary><p>Not yet.</p></details>
+  </section>
+
+  <footer>
+    <div class="l"><a href="https://github.com/Guru-raghav3245/remote-wake">Source code on GitHub</a><a href="#download">Download</a></div>
+    <p>Remote Wake is an independent project and is not affiliated with Tailscale. It bundles Tailscale (BSD-3-Clause) and the Figtree font (SIL Open Font License).</p>
+  </footer>
+</div>
+<script>
+(function(){
+  var r=document.documentElement,k="rw-theme",b=document.getElementById("theme");
+  try{var s=localStorage.getItem(k);if(s)r.setAttribute("data-theme",s)}catch(e){}
+  b.addEventListener("click",function(){
+    var dark=r.getAttribute("data-theme")?r.getAttribute("data-theme")==="dark":matchMedia("(prefers-color-scheme:dark)").matches;
+    var n=dark?"light":"dark";r.setAttribute("data-theme",n);try{localStorage.setItem(k,n)}catch(e){}
+  });
+})();
+</script>
+</body>
+</html>
