@@ -6,6 +6,7 @@ import 'engine.dart';
 import 'native.dart';
 import 'store.dart';
 import 'terminal_page.dart';
+import 'tutorial.dart';
 
 void main() => runApp(MaterialApp(theme: ThemeData(colorSchemeSeed: Colors.deepPurple, useMaterial3: true), home: const Home()));
 
@@ -28,6 +29,12 @@ class _HomeState extends State<Home> {
       if (mounted) setState(() => st = n);
     });
     _start();
+    WidgetsBinding.instance.addPostFrameCallback((_) async { if (!await Store.tutorialSeen()) await _tutorial(); });
+  }
+
+  Future<void> _tutorial() async {
+    await Store.setTutorialSeen();
+    if (mounted) await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TutorialPage(onConnect: _open)));
   }
 
   Future<void> _start() async {
@@ -65,7 +72,7 @@ class _HomeState extends State<Home> {
     final peers = ((st['peers'] as List?) ?? []).cast<Map>().toList()
       ..sort((a, b) => ((b['online'] == true ? 2 : 0) + (b['os'] == 'macOS' ? 1 : 0)).compareTo((a['online'] == true ? 2 : 0) + (a['os'] == 'macOS' ? 1 : 0)));
     return Scaffold(
-      appBar: AppBar(title: const Text('Remote Wake')),
+      appBar: AppBar(title: const Text('Remote Wake'), actions: [IconButton(icon: const Icon(Icons.help_outline), tooltip: 'Tutorial', onPressed: _tutorial)]),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(running ? 'Connected to Tailscale' : 'Tailscale: ${st['state']}', style: Theme.of(c).textTheme.titleMedium),

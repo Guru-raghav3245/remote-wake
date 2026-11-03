@@ -99,6 +99,63 @@ struct Row: View {
     var body: some View { HStack { Text(k).foregroundStyle(.secondary); Spacer(); Text(v).monospacedDigit() } }
 }
 
+// Interactive first-run tutorial: a live checklist with the real action buttons; each step ticks itself when done.
+// (The Android app has the same guide.) Reopen from "Tutorial" in the main window.
+struct Tutorial: View {
+    @ObservedObject var m: Model
+    var close: () -> Void
+    var done: [Bool] { [m.installed && m.tsState != "not installed", m.tsState == "Running", m.running, !m.phones.isEmpty] }
+    var cur: Int { done.firstIndex(of: false) ?? -1 }
+    func step<A: View>(_ n: Int, _ title: String, _ text: String, @ViewBuilder _ action: () -> A) -> some View {
+            VStack(alignment: .leading, spacing: 6) {
+                Label("\(n + 1). \(title)", systemImage: done[n] ? "checkmark.circle.fill" : (n == cur ? "circle.inset.filled" : "circle"))
+                    .font(.headline).foregroundStyle(done[n] ? Color.green : (n == cur ? Color.primary : Color.secondary))
+                if n == cur {
+                    Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    action().disabled(m.busy)
+                }
+            }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
+             .background(n == cur ? Color.accentColor.opacity(0.12) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Set up Remote Wake").font(.title2.bold())
+            Text("Keeps this Mac awake while plugged in, lid closed too, and lets your Android phone open a terminal on it. Tailscale links them: private and free.")
+                .font(.callout).fixedSize(horizontal: false, vertical: true)
+            step(0, "Install", "Installs Tailscale and the stay-awake service. You'll be asked for your Mac password once.") { Button("Install") { m.install() } }
+            step(1, "Connect Tailscale", "Sign in with the account you'll also use on your phone.") {
+                if m.tsState == "NeedsLogin", let u = m.authURL, let url = URL(string: u) { Button("Sign in to Tailscale") { NSWorkspace.shared.open(url) } }
+                else { Button("Connect Tailscale") { m.connect() } }
+            }
+            step(2, "Stay awake on AC", "Turn this on. On battery the Mac sleeps normally, so keep it plugged in.") {
+                Toggle("Stay awake on AC", isOn: Binding(get: { m.running }, set: { _ in m.toggle() })).toggleStyle(.switch)
+            }
+            step(3, "Set up your phone", "Copy the phone app to your Android phone and install it, open it, sign in to Tailscale with the same account, then tap this Mac. This step ticks when the phone shows up.") {
+                if FileManager.default.fileExists(atPath: resRoot + "/RemoteWake.apk") {
+                    Button("Show phone app in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: resRoot + "/RemoteWake.apk")]) }
+                }
+            }
+            Text("Good to know").font(.headline).padding(.top, 4)
+            Text("• About every 12 hours Tailscale asks the phone to approve a connection in the browser; the phone app shows an Approve button.\n• If the connection drops the phone reconnects, but running programs stop. Use tmux to keep them.\n• After a power cut with FileVault on, this Mac waits for its password at startup and can't be reached until unlocked.\n• The moon icon in the menu bar stays when you close this window or quit the app.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack { Spacer(); Button(cur == -1 ? "Done" : "Skip for now") { close() }.keyboardShortcut(.defaultAction) }
+        }.padding(20).frame(width: 400)
+    }
+}
+
+// Main window: tutorial on first run, then the panel.
+struct Root: View {
+    @ObservedObject var m: Model
+    @AppStorage("tutorialSeen") var seen = false
+    @State private var showing = false
+    var body: some View {
+        Group {
+            if showing { Tutorial(m: m) { seen = true; showing = false } }
+            else { VStack(spacing: 0) { Panel(m: m); Button("Tutorial") { showing = true }.buttonStyle(.link).padding(.bottom, 10) } }
+        }.onAppear { showing = !seen }
+    }
+}
+
 struct Panel: View {
     @ObservedObject var m: Model
     var body: some View {
@@ -174,7 +231,7 @@ struct MainApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject var m = Model()
     var body: some Scene {
-        Window("Remote Wake", id: "main") { Panel(m: m) }.windowResizability(.contentSize)
+        Window("Remote Wake", id: "main") { Root(m: m) }.windowResizability(.contentSize)
     }
 }
 

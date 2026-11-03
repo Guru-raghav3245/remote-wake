@@ -138,6 +138,11 @@ Question: can a phone app embed the Tailscale engine (no VpnService, no root) an
 - `/Applications/Remote Wake.app` replaced with this build; `app/build/` and the old `~/Downloads/Remote Wake.dmg` deleted; only `app/Remote Wake.dmg` remains.
 - Not tested: helper start after a real reboot/login, the window on screen (only processes were checked), SwiftUI has no conditional scenes (hence two `App` structs).
 
+### Interactive first-run tutorial (3 Nov 2026) — built, Mac side seen on screen
+- Both apps open a live checklist on first run; each step shows the real action button and ticks itself. Mac (`Tutorial`/`Root` in `app/RemoteWakeMenu.swift`, setting `tutorialSeen`, reopen with the "Tutorial" link): Install, Connect Tailscale (Sign in button when `NeedsLogin`), Stay awake on AC (the real switch), Set up your phone (ticks when an Android node exists, even an offline one). Android (`android-app/lib/tutorial.dart`, `Store.tutorialSeen`, "?" button): Sign in to Tailscale, Allow background running (battery exemption), Find your Mac (ticks when a macOS peer is online; tapping it opens the user-name dialog). "Good to know" text is duplicated in both apps; edit both.
+- Android tutorial page was built and installed on the phone but not seen on screen yet (the phone was in use).
+- Fresh-user wipe done 3 Nov on request: phone apps `com.guru.remote_wake_app` and `com.tailscale.ipn` uninstalled; Mac app, prefs, stay-awake daemon, sudoers rule, system Tailscale (daemon, binaries, `/var/lib/tailscale`) removed (root part via an osascript admin dialog; plain `sudo` fails in the `!` prompt, no terminal). Stale nodes in the Tailscale admin console are the user's to delete. Only `app/Remote Wake.dmg` and `~/Downloads/RemoteWake.apk` remain as installers.
+
 ### Spec rewritten (2 Nov 2026)
 `Remote Wake for Mac Product Spec v3.md` describes the current design (stay awake on AC, bundled Tailscale + SSH, Android app, what is validated, risks, costs, open decisions, cleanup). The old `... Spec v2.md` (wake loop + cloud) is kept untouched for history; `... v2.0 (backup).md` too. The tailnet's SSH policy lists `root` as an allowed user (seen in `tailscale debug netmap`): the app only offers the user typed in, but tighten the rule if that matters.
 
