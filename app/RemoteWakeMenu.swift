@@ -5,6 +5,14 @@ let label = "com.guru.stayawake"
 let plist = "/Library/LaunchDaemons/\(label).plist"
 let sudoersPath = "/etc/sudoers.d/stayawake"
 
+import ServiceManagement
+
+// Two modes from one binary: the main app (window + Dock) and the helper (menu bar icon only, runs at login,
+// stays alive when the main app quits). The helper sits at Remote Wake.app/Contents/Library/LoginItems/.
+let isHelper = Bundle.main.bundleIdentifier?.hasSuffix(".helper") == true
+let mainAppURL = isHelper ? Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent() : Bundle.main.bundleURL
+let resRoot = mainAppURL.appendingPathComponent("Contents/Resources").path
+
 func run(_ cmd: String, _ args: [String]) -> (status: Int32, out: String) {
     let p = Process(), pipe = Pipe()
     p.executableURL = URL(fileURLWithPath: cmd); p.arguments = args
@@ -16,7 +24,7 @@ func run(_ cmd: String, _ args: [String]) -> (status: Int32, out: String) {
 
 // One admin-password prompt: installs the daemon from the app bundle plus the rule that lets this user toggle it silently.
 func rootInstall() -> Bool {
-    let r = Bundle.main.resourcePath!
+    let r = resRoot
     let cmd = "/bin/bash '\(r)/agent/tailscale-install.sh' '\(r)/tailscale' && /bin/bash '\(r)/agent/stayawake-install.sh' \(NSUserName())"
     return run("/usr/bin/osascript", ["-e", "do shell script \"\(cmd)\" with administrator privileges"]).status == 0
 }
@@ -124,22 +132,50 @@ struct Panel: View {
                     Text("Next: set up your phone").font(.headline)
                     Text("1. Copy the phone app to your Android phone (cable, Drive, or email it to yourself) and open it; allow installs from that source.\n2. Open Remote Wake there and sign in to Tailscale with the same account as this Mac.\n3. Tap this Mac in the list.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    if let apk = Bundle.main.url(forResource: "RemoteWake", withExtension: "apk") {
+                    if let apk = Optional(URL(fileURLWithPath: resRoot + "/RemoteWake.apk")).flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil } {
                         Button("Show phone app in Finder") { NSWorkspace.shared.activateFileViewerSelecting([apk]) }
                     }
                 }
             }
             if let e = m.error { Text(e).font(.caption).foregroundStyle(.red) }
             Divider()
-            HStack { Button("Refresh") { m.refresh() }; Spacer(); Button("Quit") { NSApplication.shared.terminate(nil) } }
+            if isHelper {
+                Button("Open Remote Wake") { NSWorkspace.shared.openApplication(at: mainAppURL, configuration: .init()) }
+            }
+            HStack { Button("Refresh") { m.refresh() }; Spacer(); Button(isHelper ? "Quit menu icon" : "Quit") { NSApplication.shared.terminate(nil) } }
         }.padding(12).frame(width: 300)
     }
 }
 
-@main struct RemoteWakeMenu: App {
+// Main app: make sure the menu bar helper is registered for login and running now.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ n: Notification) {
+        guard !isHelper else { return }
+        let id = "com.guru.remotewake.menu.helper"
+        try? SMAppService.loginItem(identifier: id).register()
+        // register() makes launchd start the helper itself; only start it by hand if nothing runs after a moment
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            if NSRunningApplication.runningApplications(withBundleIdentifier: id).isEmpty {
+                NSWorkspace.shared.openApplication(at: mainAppURL.appendingPathComponent("Contents/Library/LoginItems/Remote Wake Menu.app"), configuration: .init())
+            }
+        }
+    }
+}
+
+struct MenuApp: App {
     @StateObject var m = Model()
     var body: some Scene {
         MenuBarExtra("Remote Wake", systemImage: m.running ? "moon.zzz.fill" : "moon.zzz") { Panel(m: m) }
             .menuBarExtraStyle(.window)
     }
 }
+
+struct MainApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    @StateObject var m = Model()
+    var body: some Scene {
+        Window("Remote Wake", id: "main") { Panel(m: m) }.windowResizability(.contentSize)
+    }
+}
+
+@main enum Entry { static func main() { if isHelper { MenuApp.main() } else { MainApp.main() } } }

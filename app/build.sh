@@ -18,9 +18,12 @@ cat > "$A/Contents/Info.plist" <<P
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>0.1</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
-<key>LSUIElement</key><true/>
 </dict></plist>
 P
+H="$A/Contents/Library/LoginItems/Remote Wake Menu.app"; mkdir -p "$H/Contents/MacOS"
+cp "$A/Contents/MacOS/RemoteWake" "$H/Contents/MacOS/"
+sed -e 's/menu<\/string>/menu.helper<\/string>/' -e 's/<key>LSMinimumSystemVersion/<key>LSUIElement<\/key><true\/><key>LSMinimumSystemVersion/' "$A/Contents/Info.plist" > "$H/Contents/Info.plist"
+codesign --force -s - "$H"
 codesign --force -s - "$A"
 rm -f "Remote Wake.dmg" build/rw.dmg
 swift make_bg.swift build/bg.png

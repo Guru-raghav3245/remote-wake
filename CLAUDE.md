@@ -131,6 +131,13 @@ Question: can a phone app embed the Tailscale engine (no VpnService, no root) an
 - `app/build.sh` bundles `android-app/build/app/outputs/flutter-apk/app-release.apk` as `Resources/RemoteWake.apk` (build the APK first; the script only prints a note if it is missing). DMG now about 54 MB. `~/Downloads/Remote Wake.dmg` updated.
 - Not done: the APK is not signed with anything beyond our own keystore, Play Protect on the phone may warn on sideload; no QR code / link (repo is private); iPhone has no equivalent.
 
+### Mac app: window + Dock + menu bar helper (3 Nov 2026) — built, tested by process checks
+- One binary, two modes chosen by bundle id (`isHelper` in `app/RemoteWakeMenu.swift`, entry `Entry.main`): the main app `Remote Wake.app` (window + Dock icon, no menu icon) and the helper `Remote Wake Menu.app` (id `com.guru.remotewake.menu.helper`, `LSUIElement`, menu bar moon only) nested in `Contents/Library/LoginItems/`. `app/build.sh` copies the binary into the helper bundle and signs helper then app (ad-hoc).
+- The main app calls `SMAppService.loginItem(...).register()`; launchd then starts the helper itself and at every login. The main app starts it by hand only if nothing runs 2 s later. Quitting the main app leaves the helper (and the stay-awake daemon) running; the helper menu has "Open Remote Wake" and "Quit menu icon". Helper resources (scripts, Tailscale, APK) come from the main app via `resRoot`.
+- Bug found: three/two menu icons. Causes: an old `/Applications/Remote Wake.app` (30 Oct, menu-only) was running, and a hand launch plus launchd's own start made two helpers (`open -n` forces a second copy; never use it). The launchd-started helper shows in `ps` as `com.guru.remotewake.menu.helper` (not `RemoteWake`), so `pkill -x RemoteWake` misses it; kill it by pid.
+- `/Applications/Remote Wake.app` replaced with this build; `app/build/` and the old `~/Downloads/Remote Wake.dmg` deleted; only `app/Remote Wake.dmg` remains.
+- Not tested: helper start after a real reboot/login, the window on screen (only processes were checked), SwiftUI has no conditional scenes (hence two `App` structs).
+
 ### Spec rewritten (2 Nov 2026)
 `Remote Wake for Mac Product Spec v3.md` describes the current design (stay awake on AC, bundled Tailscale + SSH, Android app, what is validated, risks, costs, open decisions, cleanup). The old `... Spec v2.md` (wake loop + cloud) is kept untouched for history; `... v2.0 (backup).md` too. The tailnet's SSH policy lists `root` as an allowed user (seen in `tailscale debug netmap`): the app only offers the user typed in, but tighten the rule if that matters.
 
