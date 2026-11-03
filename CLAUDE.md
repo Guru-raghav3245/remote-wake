@@ -150,6 +150,12 @@ Question: can a phone app embed the Tailscale engine (no VpnService, no root) an
 - Not seen yet: light mode on both, the Mac setup checklist and menu bar panel on screen, Approve/Reconnecting banners. Known nit: extra space under the last step in the Android guide when all steps are done. The tailnet may still list stale offline nodes (an old Mac node and old phone nodes): user to delete in the admin console.
 - Still to do: website with the same design (Vercel), refreshed app icon.
 
+### Website + first release (3 Nov 2026) — LIVE
+- Site: static page in `site/` (Sage light/dark, Figtree, no build), deployed on Vercel as project `remote-wake`, live at https://remote-wake.vercel.app (deploy: `cd site && vercel deploy --prod --yes`; `.vercel` and `.env*` are gitignored). Downloads point at GitHub Releases `releases/latest/download/Remote-Wake.dmg` and `RemoteWake.apk`; the page shows their sha256, so UPDATE the two hashes in `site/index.html` (and the version text) for every new release.
+- Release v0.1.0 created by the user (the auto-mode classifier blocked `gh release create`, the user ran it with `!`): https://github.com/Guru-raghav3245/remote-wake/releases/tag/v0.1.0 . Files are copies of `app/Remote Wake.dmg` (as `Remote-Wake.dmg`) and `~/Downloads/RemoteWake.apk`.
+- Facts the page states: the Mac app binary is arm64-only (Apple silicon, macOS 13+; the bundled Tailscale is universal but the menu app is not), Android build is arm64 only, neither is signed with a paid certificate, no iPhone app. Making the Mac app universal would need an x86_64 build and lipo.
+- Not checked: light mode of the site on screen, real download of the files from the live links (only HTTP 200 on the redirect), Gatekeeper/Play Protect experience from a download.
+
 ### Spec rewritten (2 Nov 2026)
 `Remote Wake for Mac Product Spec v3.md` describes the current design (stay awake on AC, bundled Tailscale + SSH, Android app, what is validated, risks, costs, open decisions, cleanup). The old `... Spec v2.md` (wake loop + cloud) is kept untouched for history; `... v2.0 (backup).md` too. The tailnet's SSH policy lists `root` as an allowed user (seen in `tailscale debug netmap`): the app only offers the user typed in, but tighten the rule if that matters.
 
