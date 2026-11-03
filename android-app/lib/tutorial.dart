@@ -62,7 +62,7 @@ class _TutorialPageState extends State<TutorialPage> {
     final cur = done.indexOf(false);
     const tips = [
       (Icons.schedule, 'About every 12 hours Tailscale asks you to approve a connection in the browser. Tap Approve when the banner shows.'),
-      (Icons.sync, 'If the connection drops the app reconnects, but programs that were running stop. Use tmux on the Mac to keep them.'),
+      (Icons.sync, 'If the connection drops the app reconnects. Turn on Phone sessions in the Mac app to keep your programs running and stay signed in to tools like Claude Code.'),
       (Icons.lock_outline, 'After a power cut with FileVault on, the Mac waits for its password and cannot be reached until someone unlocks it.'),
     ];
     return Scaffold(

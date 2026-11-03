@@ -4,6 +4,7 @@ set -e; cd "$(dirname "$0")"
 A="build/Remote Wake.app"; rm -rf build; mkdir -p "$A/Contents/MacOS"
 swiftc -O -parse-as-library -o "$A/Contents/MacOS/RemoteWake" RemoteWakeMenu.swift
 mkdir -p "$A/Contents/Resources/agent" "$A/Contents/Resources/Fonts"; cp fonts/Figtree.ttf fonts/OFL.txt "$A/Contents/Resources/Fonts/"; cp AppIcon.icns "$A/Contents/Resources/"; cp ../agent/tailscale-install.sh ../agent/stayawake-install.sh ../agent/stayawake-uninstall.sh ../agent/com.guru.stayawake.plist "$A/Contents/Resources/agent/"
+[ -d vendor/tmux ] && cp -R vendor/tmux "$A/Contents/Resources/tmux" || echo "note: no vendor/tmux (run ./build-tmux.sh); Phone sessions will be hidden"
 [ -d vendor/tailscale ] && cp -R vendor/tailscale "$A/Contents/Resources/tailscale" || echo "note: no vendor/tailscale (run ./build-tailscale.sh); app will not bundle Tailscale"
 APK=../android-app/build/app/outputs/flutter-apk/app-release.apk
 [ -f "$APK" ] && cp "$APK" "$A/Contents/Resources/RemoteWake.apk" || echo "note: no release APK (cd ../android-app && flutter build apk --release --target-platform android-arm64); app will not bundle the phone app"

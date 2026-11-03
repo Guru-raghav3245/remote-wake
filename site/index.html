@@ -198,7 +198,8 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
     <details><summary>Does my Mac stay awake on battery?</summary><p>No. It stays awake only while plugged in. On battery it sleeps like normal, which protects your battery.</p></details>
     <details><summary>What is Tailscale and do I need an account?</summary><p>Tailscale makes the private link between your devices. You need a free account, and you sign in once on the Mac and once on the phone with the same account.</p></details>
     <details><summary>Every so often my phone asks me to approve a connection.</summary><p>That is Tailscale's safety check, about every 12 hours. The app shows an Approve button that opens the approval page.</p></details>
-    <details><summary>What if the connection drops?</summary><p>The app reconnects by itself, but programs that were running in the terminal stop. Run long jobs inside tmux on the Mac to keep them alive.</p></details>
+    <details><summary>Claude Code or another tool asks me to log in on the phone?</summary><p>Tools like Claude Code keep their login in the Mac's Keychain, which a phone connection cannot open. Switch on <b>Phone sessions</b> in the Mac app: phone terminals then join a session in your desktop login, where those saved logins work. It adds a short block to your <code>~/.zshrc</code> and needs the Mac to be logged in (a locked screen is fine).</p></details>
+    <details><summary>What if the connection drops?</summary><p>The app reconnects by itself. With Phone sessions switched on in the Mac app, your programs keep running and you land back in the same session. Without it, programs that were running stop.</p></details>
     <details><summary>What happens after a power cut?</summary><p>If FileVault is on, the Mac waits for its password at startup, and nothing can reach it until someone unlocks it.</p></details>
     <details><summary>Is there an iPhone app?</summary><p>Not yet.</p></details>
   </section>

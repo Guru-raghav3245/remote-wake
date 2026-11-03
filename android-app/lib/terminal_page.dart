@@ -57,12 +57,12 @@ class _TerminalPageState extends State<TerminalPage> {
     if (pin.isEmpty) await Store.setHostKey(widget.ip, Engine.lastHostKey()); // trust on first use
     id = r;
     Engine.shellResize(id, term.viewWidth, term.viewHeight); // the layout may have changed while connecting
-    if (reconnecting) term.write('\r\n[reconnected: new shell, earlier programs were stopped]\r\n');
+    if (reconnecting) term.write('\r\n[reconnected: programs outside a phone session were stopped]\r\n');
     reconnecting = false; gaveUp = false; attempt = 0;
     setState(() => status = 'connected in ${sw.elapsedMilliseconds} ms');
     poll = Timer.periodic(const Duration(milliseconds: 40), (_) {
       final b64 = Engine.shellRead(id);
-      if (b64.isNotEmpty) term.write(utf8.decode(base64.decode(b64), allowMalformed: true));
+      if (b64.isNotEmpty) { try { term.write(utf8.decode(base64.decode(b64), allowMalformed: true)); } catch (e) { debugPrint('terminal parse error: $e'); } }   // a bad escape sequence must not stop the screen
       if (!Engine.shellAlive(id)) {
         poll?.cancel();
         final dropped = Engine.shellDropped(id);

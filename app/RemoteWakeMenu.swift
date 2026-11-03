@@ -29,6 +29,54 @@ func rootInstall() -> Bool {
     return run("/usr/bin/osascript", ["-e", "do shell script \"\(cmd)\" with administrator privileges"]).status == 0
 }
 
+// MARK: - Phone sessions (tmux). SSH logins get their own session without the Keychain, so CLIs like Claude Code ask to log in.
+// A tmux server started by this GUI app lives in the desktop login session; the phone attaches to it, so saved logins work and
+// programs survive a dropped connection. `-D` keeps the server a child of this app (the normal daemonizing start would leave the desktop session).
+let phoneDir = NSHomeDirectory() + "/Library/Application Support/Remote Wake"
+let tmuxBin = phoneDir + "/tmux", tmuxSock = "remotewake"
+let zshrc = NSHomeDirectory() + "/.zshrc"
+let zMark = ("# >>> Remote Wake phone sessions >>>", "# <<< Remote Wake phone sessions <<<")
+let zBlock = """
+\(zMark.0)
+# Phone logins (SSH) join a tmux session in your desktop login, so saved logins (Keychain) work. Turn off in Remote Wake or delete this block.
+_rw="$HOME/Library/Application Support/Remote Wake/tmux"
+if [[ -n $SSH_CONNECTION && -z $TMUX && -x $_rw ]] && "$_rw" -L \(tmuxSock) has-session -t phone 2>/dev/null; then "$_rw" -L \(tmuxSock) attach -t phone && exit; fi
+unset _rw
+\(zMark.1)
+"""
+let tmuxConf = """
+set -g status-left "[#S] "
+set -g status-right ""
+set -g history-limit 20000
+set -g default-terminal "screen-256color"
+set -sg escape-time 10
+"""
+func tmux(_ a: [String]) -> Int32 { run(tmuxBin, ["-L", tmuxSock] + a).status }
+func phoneEnabled() -> Bool { ((try? String(contentsOfFile: zshrc, encoding: .utf8)) ?? "").contains(zMark.0) }
+func tmuxUp() -> Bool { FileManager.default.isExecutableFile(atPath: tmuxBin) && tmux(["has-session", "-t", "phone"]) == 0 }
+func startTmux() {
+    guard FileManager.default.isExecutableFile(atPath: tmuxBin), !tmuxUp() else { return }
+    let p = Process(); p.executableURL = URL(fileURLWithPath: tmuxBin)
+    p.arguments = ["-u", "-L", tmuxSock, "-f", phoneDir + "/tmux.conf", "-D"]   // bare -D: with a command (even start-server) tmux daemonizes a new server in the Background session instead
+    p.standardInput = FileHandle.nullDevice; p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
+    guard (try? p.run()) != nil else { return }
+    for _ in 0..<30 { usleep(100_000); if tmux(["new-session", "-d", "-s", "phone", "-c", NSHomeDirectory()]) == 0 { return } }   // wait for the socket
+}
+func setPhone(_ on: Bool) {
+    let fm = FileManager.default
+    var z = (try? String(contentsOfFile: zshrc, encoding: .utf8)) ?? ""
+    if let r = z.range(of: "\n?" + NSRegularExpression.escapedPattern(for: zMark.0) + "[\\s\\S]*?" + NSRegularExpression.escapedPattern(for: zMark.1) + "\n?", options: .regularExpression) { z.replaceSubrange(r, with: "\n") }
+    if on {
+        try? fm.createDirectory(atPath: phoneDir, withIntermediateDirectories: true)
+        _ = tmux(["kill-server"])   // so a new build is picked up
+        try? fm.removeItem(atPath: tmuxBin); try? fm.copyItem(atPath: resRoot + "/tmux/tmux", toPath: tmuxBin)
+        try? tmuxConf.write(toFile: phoneDir + "/tmux.conf", atomically: true, encoding: .utf8)
+        z += (z.hasSuffix("\n") || z.isEmpty ? "" : "\n") + zBlock + "\n"
+    } else { _ = tmux(["kill-server"]) }
+    try? z.write(toFile: zshrc, atomically: false, encoding: .utf8)   // not atomic: keeps a symlinked .zshrc a symlink
+    if on { startTmux() }
+}
+
 func tsPath() -> String? { ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tailscale"].first { FileManager.default.isExecutableFile(atPath: $0) } }
 
 @MainActor final class Model: ObservableObject {
@@ -40,9 +88,12 @@ func tsPath() -> String? { ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tails
     @Published var tsIP = ""
     @Published var authURL: String?
     @Published var phones: [String] = []   // Android devices already on the tailnet (name, with " (offline)" if so)
+    @Published var phoneOn = false     // the .zshrc block is there
+    @Published var tmuxRunning = false
     @Published var busy = false
     @Published var error: String?
     var timer: Timer?
+    var tmuxStarting = false
 
     init() { refresh(); timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in Task { @MainActor in self.refresh() } } }
 
@@ -51,6 +102,8 @@ func tsPath() -> String? { ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tails
         running = run("/bin/launchctl", ["print", "system/\(label)"]).status == 0
         onAC = run("/usr/bin/pmset", ["-g", "batt"]).out.contains("AC Power")
         holding = run("/usr/bin/pmset", ["-g", "assertions"]).out.range(of: #"PreventSystemSleep\s+1"#, options: .regularExpression) != nil
+        phoneOn = phoneEnabled(); tmuxRunning = phoneOn && tmuxUp()
+        if isHelper && phoneOn && !tmuxRunning && !tmuxStarting { tmuxStarting = true; Task.detached { startTmux(); await MainActor.run { self.tmuxStarting = false } } }   // at login, or if it died
         let hasDaemon = ["/usr/local/bin/tailscaled", "/opt/homebrew/bin/tailscaled"].contains { FileManager.default.isExecutableFile(atPath: $0) }
         guard let ts = tsPath(), hasDaemon else { tsState = "not installed"; tsIP = ""; authURL = nil; return }
         let j = (try? JSONSerialization.jsonObject(with: Data(run(ts, ["status", "--json"]).out.utf8))) as? [String: Any]
@@ -74,6 +127,11 @@ func tsPath() -> String? { ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tails
             let done = ok
             await MainActor.run { self.busy = false; self.error = done ? nil : "Toggle cancelled or failed"; self.refresh() }
         }
+    }
+
+    func phoneSessions(_ on: Bool) {
+        busy = true
+        Task.detached { setPhone(on); await MainActor.run { self.busy = false; self.refresh() } }
     }
 
     func connect() {
@@ -250,10 +308,32 @@ struct PhoneCard: View {
     }
 }
 
+struct PhoneSessionsCard: View {
+    @ObservedObject var m: Model
+    var body: some View {
+        if FileManager.default.fileExists(atPath: resRoot + "/tmux/tmux") {
+            VStack(alignment: .leading, spacing: S.md) {
+                HStack(alignment: .center, spacing: S.lg) {
+                    VStack(alignment: .leading, spacing: S.xs) {
+                        Text("Phone sessions").font(ff(17, .semibold)).foregroundStyle(T.text)
+                        Text("Phone terminals share a session with your desktop login, so Claude Code, git and other tools stay signed in, and programs keep running if the phone drops.")
+                            .font(ff(14)).foregroundStyle(T.muted).fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: S.md)
+                    Toggle("Phone sessions", isOn: Binding(get: { m.phoneOn }, set: { m.phoneSessions($0) })).labelsHidden().toggleStyle(.switch).tint(T.accent).disabled(m.busy)
+                }
+                if m.phoneOn { Status(word: m.tmuxRunning ? "Ready" : "Starting", color: m.tmuxRunning ? T.accent : T.warn) }
+                Text("Adds a short block to ~/.zshrc (turning this off removes it). Needs this Mac to be logged in; a locked screen is fine.")
+                    .font(ff(12)).foregroundStyle(T.muted).fixedSize(horizontal: false, vertical: true)
+            }.card()
+        }
+    }
+}
+
 struct HelpSheet: View {
     var close: () -> Void
     let tips = [("clock.arrow.circlepath", "About every 12 hours Tailscale asks your phone to approve a connection in the browser. The phone app shows an Approve button."),
-                ("arrow.triangle.2.circlepath", "If the connection drops, the phone reconnects, but programs that were running stop. Use tmux to keep them."),
+                ("arrow.triangle.2.circlepath", "If the connection drops, the phone reconnects. With Phone sessions on, your programs keep running and you land back in the same session."),
                 ("lock.shield", "After a power cut with FileVault on, this Mac waits for its password at startup and cannot be reached until someone unlocks it."),
                 ("menubar.rectangle", "The moon icon in the menu bar stays when you close this window or quit the app.")]
     var body: some View {
@@ -305,6 +385,7 @@ struct MainView: View {
                     TailscaleRow(m: m)
                 }.card()
                 PhoneCard(m: m)
+                PhoneSessionsCard(m: m)
             }
             if let e = m.error { Text(e).font(ff(13)).foregroundStyle(T.warn).padding(S.md).frame(maxWidth: .infinity, alignment: .leading).background(T.warnBg, in: RoundedRectangle(cornerRadius: 8)) }
         }
@@ -336,6 +417,9 @@ struct MenuView: View {
                     InfoRow(icon: m.onAC ? "powerplug.fill" : "battery.50", label: "Power") { value(m.onAC ? "Plugged in" : "On battery") }
                     InfoRow(icon: "network", label: "Tailscale") { value(m.tsIP) }
                     InfoRow(icon: "iphone", label: "Phone") { value(m.phones.first ?? "Not set up") }
+                    if FileManager.default.fileExists(atPath: resRoot + "/tmux/tmux") {
+                        InfoRow(icon: "terminal", label: "Phone sessions") { Toggle("Phone sessions", isOn: Binding(get: { m.phoneOn }, set: { m.phoneSessions($0) })).labelsHidden().toggleStyle(.switch).tint(T.accent).disabled(m.busy) }
+                    }
                 }.card()
             }
             if let e = m.error { Text(e).font(ff(13)).foregroundStyle(T.warn) }
