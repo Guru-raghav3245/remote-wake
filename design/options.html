@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Remote Wake design options</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Fraunces:opsz,wght@9..144,700&family=Outfit:wght@600;700&family=IBM+Plex+Sans:wght@500;600&family=Nunito:wght@700;800&family=DM+Sans:wght@500;700&family=Source+Serif+4:opsz,wght@8..60,600&family=Figtree:wght@600;700&family=Geist:wght@500;700&family=Plus+Jakarta+Sans:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0d0d10;color:#ddd;font-family:Inter,system-ui,sans-serif}
+.nav{position:sticky;top:0;z-index:5;background:#0d0d10;border-bottom:1px solid #2a2a31;padding:12px 24px;display:flex;gap:16px;align-items:center}
+.nav b{color:#fff}.nav a{color:#9aa;text-decoration:none;font-size:14px}.nav a:hover{color:#fff}
+section.opt{padding:48px 24px;background:var(--bg);color:var(--text);font-family:var(--body,Inter),sans-serif}
+.wrap{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:300px 330px 1fr;gap:40px;align-items:start}
+@media(max-width:1100px){.wrap{grid-template-columns:1fr}}
+.tag{font-size:13px;letter-spacing:.08em;font-weight:600;color:var(--accent-text)}
+h1{margin:6px 0 12px;font-family:var(--head);font-size:46px;line-height:1.05;font-weight:var(--hw,700);letter-spacing:var(--ls,0)}
+p.lead{margin:0 0 18px;line-height:1.5;color:var(--muted)}
+.sw{display:flex;gap:10px;margin-bottom:10px}.sw i{width:52px;height:52px;border-radius:var(--r);border:1px solid var(--line);display:block}
+.hex{font:12px/1.7 ui-monospace,Menlo,monospace;color:var(--muted)}
+.win{border-radius:var(--r);background:var(--card);border:1px solid var(--line);overflow:hidden;box-shadow:var(--shadow)}
+.bar{height:32px;background:var(--bar);display:flex;align-items:center;gap:7px;padding:0 12px;font-size:12px;color:var(--muted)}
+.bar s{width:11px;height:11px;border-radius:50%;display:inline-block}
+.pad{padding:20px;display:flex;flex-direction:column;gap:12px}
+.win h3{margin:0;font-family:var(--head);font-size:20px}
+.st{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--muted)}.ok{color:var(--accent-text);font-weight:700}
+.cur{background:var(--bg);border:1px solid var(--accent);border-radius:calc(var(--r) - 2px);padding:14px;display:flex;flex-direction:column;gap:10px}
+.cur b{font-size:14px;color:var(--text)}.cur small{font-size:13px;color:var(--muted);line-height:1.45}
+.sw2{width:42px;height:24px;border-radius:12px;background:var(--accent);position:relative;display:inline-block}.sw2:after{content:"";position:absolute;right:3px;top:3px;width:18px;height:18px;border-radius:50%;background:var(--on-accent)}
+.right{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}
+.phone{width:250px;height:520px;border-radius:32px;background:var(--bg);border:2px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:10px}
+.phone h3{padding:10px 2px;font-size:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r2);padding:12px;font-size:14px}.card small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.card.sel{border-color:var(--accent)}.card.off{opacity:.55}
+.btn{height:46px;border-radius:23px;background:var(--accent);color:var(--on-accent);font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:center;margin-top:auto}
+.site{flex:1;min-width:360px;border-radius:var(--r);border:1px solid var(--line);overflow:hidden;background:var(--bg)}
+.site .url{height:30px;background:var(--bar);display:flex;align-items:center;padding:0 12px;font-size:11px;color:var(--muted)}
+.hero{padding:30px 28px;display:flex;flex-direction:column;gap:14px}
+.hero .brand{font-family:var(--head);font-weight:600;font-size:15px;color:var(--accent-text)}
+.hero h2{margin:0;font-weight:var(--hw,700);letter-spacing:var(--ls,0);font-family:var(--head);font-size:32px;line-height:1.1}
+.hero p{margin:0;font-size:14px;line-height:1.5;color:var(--muted)}
+.ctas{display:flex;gap:10px;margin-top:6px}.ctas span{padding:12px 18px;border-radius:var(--rb);font-weight:600;font-size:14px}
+.p{background:var(--accent);color:var(--on-accent)}.s{border:1.5px solid var(--text)}
+.steps{margin-top:8px;background:var(--card);border:1px solid var(--line);border-radius:var(--r2);padding:14px;font-size:13px;color:var(--muted);line-height:1.6}
+.steps b{color:var(--accent-text)}
+
+.midnight{--bg:#141418;--card:#1E1E25;--bar:#26262E;--line:#34343F;--text:#F2F2F4;--muted:#A9A9B5;--accent:#5EE6B8;--accent-text:#5EE6B8;--on-accent:#0B1F18;--head:'JetBrains Mono',monospace;--r:12px;--r2:12px;--rb:10px;--shadow:none}
+.dawn{--bg:#F5F1E8;--card:#FFFFFF;--bar:#EFE9DB;--line:#D9D1BF;--text:#1D1B2E;--muted:#5C586B;--accent:#C2410C;--accent-text:#C2410C;--on-accent:#FFFFFF;--head:Fraunces,serif;--r:14px;--r2:14px;--rb:12px;--shadow:0 8px 24px rgba(29,27,46,.08)}
+.dusk{--bg:#17153B;--card:#221F52;--bar:#2B2866;--line:#3A3768;--text:#F1EFFF;--muted:#B9B5E0;--accent:#FCD97A;--accent-text:#FCD97A;--on-accent:#17153B;--head:Outfit,sans-serif;--r:18px;--r2:18px;--rb:24px;--shadow:none}
+
+.graphite{--bg:#08090A;--card:#101114;--bar:#16171A;--line:#232428;--text:#F7F8F8;--muted:#8A8F98;--accent:#7B8AFF;--accent-text:#9AA5FF;--on-accent:#08090A;--head:Inter,sans-serif;--hw:600;--ls:-.03em;--r:10px;--r2:8px;--rb:8px;--shadow:none}
+.plain{--bg:#FFFFFF;--card:#FAFAFA;--bar:#F2F2F2;--line:#E5E5E5;--text:#171717;--muted:#636363;--accent:#006BFF;--accent-text:#0060E6;--on-accent:#FFFFFF;--head:Geist,sans-serif;--body:Geist;--hw:700;--ls:-.04em;--r:8px;--r2:8px;--rb:6px;--shadow:0 2px 8px rgba(0,0,0,.06)}
+.brick{--bg:#F9F7F6;--card:#FFFFFF;--bar:#F0EDEA;--line:#E3DED9;--text:#181717;--muted:#5F5B58;--accent:#B83D37;--accent-text:#B83D37;--on-accent:#FFFFFF;--head:Inter,sans-serif;--hw:300;--ls:-.02em;--r:12px;--r2:10px;--rb:10px;--shadow:0 4px 16px rgba(24,23,23,.06)}
+.ember{--bg:#07080A;--card:#0F1013;--bar:#16171B;--line:#26272D;--text:#F4F4F5;--muted:#9A9AA4;--accent:#FF6363;--accent-text:#FF7878;--on-accent:#07080A;--head:Inter,sans-serif;--hw:700;--ls:-.025em;--r:12px;--r2:12px;--rb:10px;--shadow:none}
+.violet{--bg:#FFFFFF;--card:#F6F9FC;--bar:#EEF2F7;--line:#E3E8EF;--text:#1A2B4A;--muted:#516078;--accent:#533AFD;--accent-text:#533AFD;--on-accent:#FFFFFF;--head:'Plus Jakarta Sans',sans-serif;--hw:700;--ls:-.02em;--r:14px;--r2:12px;--rb:20px;--shadow:0 12px 32px rgba(50,50,93,.12)}
+.nord{--bg:#2E3440;--card:#3B4252;--bar:#434C5E;--line:#4C566A;--text:#D8DEE9;--muted:#9FAABD;--accent:#88C0D0;--accent-text:#88C0D0;--on-accent:#2E3440;--head:'IBM Plex Sans',sans-serif;--hw:600;--r:8px;--r2:8px;--rb:6px;--shadow:none}
+.mocha{--bg:#1E1E2E;--card:#313244;--bar:#181825;--line:#45475A;--text:#CDD6F4;--muted:#A6ADC8;--accent:#CBA6F7;--accent-text:#CBA6F7;--on-accent:#1E1E2E;--head:Nunito,sans-serif;--hw:800;--r:16px;--r2:14px;--rb:14px;--shadow:none}
+.rose{--bg:#232136;--card:#2A273F;--bar:#393552;--line:#44415A;--text:#E0DEF4;--muted:#908CAA;--accent:#EA9A97;--accent-text:#EA9A97;--on-accent:#232136;--head:'DM Sans',sans-serif;--hw:700;--r:14px;--r2:12px;--rb:12px;--shadow:none}
+.latte{--bg:#EFF1F5;--card:#E6E9EF;--bar:#DCE0E8;--line:#CCD0DA;--text:#4C4F69;--muted:#6C6F85;--accent:#1E66F5;--accent-text:#1E66F5;--on-accent:#EFF1F5;--head:Nunito,sans-serif;--hw:800;--r:16px;--r2:14px;--rb:14px;--shadow:none}
+.oat{--bg:#F7F6F3;--card:#FFFFFF;--bar:#EFEDE8;--line:#E3E1DB;--text:#37352F;--muted:#787774;--accent:#2F6FB3;--accent-text:#2F6FB3;--on-accent:#FFFFFF;--head:'Source Serif 4',serif;--hw:600;--r:6px;--r2:6px;--rb:6px;--shadow:0 1px 3px rgba(55,53,47,.08)}
+.sage{--bg:#EEF2EC;--card:#F8FAF6;--bar:#E1E8DE;--line:#D3DCCF;--text:#2F3A33;--muted:#5E6B61;--accent:#4F7A5A;--accent-text:#4F7A5A;--on-accent:#FFFFFF;--head:Figtree,sans-serif;--hw:700;--r:18px;--r2:16px;--rb:20px;--shadow:none}.sagedark{--bg:#151B17;--card:#1D2520;--bar:#101512;--line:#2E3A33;--text:#E4EBE5;--muted:#9BAB9F;--accent:#8FBF9A;--accent-text:#8FBF9A;--on-accent:#11201A;--head:Figtree,sans-serif;--hw:700;--r:18px;--r2:16px;--rb:20px;--shadow:none}
+</style>
+</head>
+<body>
+<div class="nav"><b>Remote Wake design options</b><a href="#midnight">A. Midnight</a><a href="#dawn">B. Dawn</a><a href="#dusk">C. Dusk</a><a href="#graphite">D. Graphite</a><a href="#plain">E. Plain</a><a href="#brick">F. Brick</a><a href="#ember">G. Ember</a><a href="#violet">H. Violet</a><a href="#nord">I. Nord</a><a href="#mocha">J. Mocha</a><a href="#rose">K. Rosé</a><a href="#latte">L. Latte</a><a href="#oat">M. Oat</a><a href="#sage">N. Sage (light)</a><a href="#sagedark">N. Sage (dark)</a></div>
+
+<template id="t">
+<div class="wrap">
+  <div>
+    <div class="tag" data-k="tag"></div>
+    <h1 data-k="name"></h1>
+    <p class="lead" data-k="lead"></p>
+    <div class="sw"><i style="background:var(--bg)"></i><i style="background:var(--card)"></i><i style="background:var(--line)"></i><i style="background:var(--text)"></i><i style="background:var(--accent)"></i></div>
+    <div class="hex" data-k="hex"></div>
+  </div>
+  <div class="win" style="align-self:start;margin-top:8px">
+    <div class="bar"><s style="background:#FF5F57"></s><s style="background:#FEBC2E"></s><s style="background:#28C840"></s><span style="margin:0 auto">Remote Wake</span></div>
+    <div class="pad">
+      <h3>Set up Remote Wake</h3>
+      <div class="st"><span class="ok">&#10003;</span> 1. Install</div>
+      <div class="st"><span class="ok">&#10003;</span> 2. Connect Tailscale</div>
+      <div class="cur"><b>3. Stay awake on AC</b><small>Turn this on. On battery the Mac sleeps normally.</small><div class="st"><span class="sw2"></span><span style="color:var(--accent-text);font-size:12px;font-weight:600">Awake, lid closed ok</span></div></div>
+      <div class="st"><span>&#9675;</span> 4. Set up your phone</div>
+    </div>
+  </div>
+  <div class="right">
+    <div class="phone">
+      <h3>Remote Wake</h3>
+      <div class="card"><b>Connected to Tailscale</b><small>100.64.0.2</small></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px">Your computers</div>
+      <div class="card sel"><b>my-macbook</b><small>100.64.0.1 &nbsp;macOS</small></div>
+      <div class="card off"><b>old-laptop</b><small>offline</small></div>
+      <div class="btn">Open terminal</div>
+    </div>
+    <div class="site">
+      <div class="url">remote-wake.vercel.app</div>
+      <div class="hero">
+        <div class="brand" data-k="brand"></div>
+        <h2 data-k="headline"></h2>
+        <p data-k="sub"></p>
+        <div class="ctas"><span class="p">Download for Mac</span><span class="s">Android APK</span></div>
+        <div class="steps"><b>1</b> Install on your Mac &nbsp; <b>2</b> Sign in to Tailscale &nbsp; <b>3</b> Tap your Mac on your phone</div>
+      </div>
+    </div>
+  </div>
+</div>
+</template>
+
+<section class="opt midnight" id="midnight"></section>
+<section class="opt dawn" id="dawn"></section>
+<section class="opt dusk" id="dusk"></section>
+<section class="opt graphite" id="graphite"></section>
+<section class="opt plain" id="plain"></section>
+<section class="opt brick" id="brick"></section>
+<section class="opt ember" id="ember"></section>
+<section class="opt violet" id="violet"></section>
+<section class="opt nord" id="nord"></section>
+<section class="opt mocha" id="mocha"></section>
+<section class="opt rose" id="rose"></section>
+<section class="opt latte" id="latte"></section>
+<section class="opt oat" id="oat"></section>
+<section class="opt sage" id="sage"></section>
+<section class="opt sagedark" id="sagedark"></section>
+
+<script>
+const data = {
+  midnight: {tag:'OPTION A', name:'Midnight', lead:'A terminal that sleeps with one eye open. Near-black, one mint accent, monospace titles. It grows straight out of the current app icon.', hex:'#141418 ground · #1E1E25 card<br>#34343F line · #F2F2F4 text<br>#5EE6B8 signature mint<br>JetBrains Mono + Inter', brand:'>_ remote wake', headline:'Your Mac stays awake.<br>Your phone gets in.', sub:'Lid closed, plugged in, anywhere in the world. Free, private, no servers of ours.'},
+  dawn: {tag:'OPTION B', name:'Dawn', lead:'Calm, warm and human: paper background, deep ink text, one sunrise-orange accent. Says "your Mac is resting safely", not "hacker tool".', hex:'#F5F1E8 paper · #FFFFFF card<br>#D9D1BF line · #1D1B2E ink<br>#C2410C signature sunrise<br>Fraunces + Inter', brand:'Remote Wake', headline:'Close the lid.<br>Keep the connection.', sub:'Your plugged-in Mac stays awake and your phone can open a terminal on it from anywhere. Free and private.'},
+  dusk: {tag:'OPTION C', name:'Dusk', lead:'Friendly and moon-led: deep indigo ground, soft moon-yellow accent, rounded geometric type. Leans into the sleeping-Mac idea; approachable for non-engineers.', hex:'#17153B ground · #221F52 card<br>#3A3768 line · #F1EFFF text<br>#FCD97A signature moon<br>Outfit + Inter', brand:'&#9790; Remote Wake', headline:'Let your Mac sleep tight.<br>Stay in reach.', sub:'Plugged in, lid closed, still one tap away from your phone. Free and private, powered by Tailscale.'}
+,
+  graphite: {tag:'OPTION D · inspired by Linear', name:'Graphite', lead:'Quiet, precise and dark: near-black surfaces, hairline borders, one cool indigo accent, tight Inter. Feels like serious software that stays out of your way.', hex:'#08090A ground · #101114 card<br>#232428 line · #F7F8F8 text<br>#7B8AFF signature indigo<br>Inter, tight tracking', brand:'Remote Wake', headline:'Keep your Mac awake.<br>Reach it from anywhere.', sub:'Plugged in, lid closed, one tap from your phone. Free and private.'},
+  plain: {tag:'OPTION E · inspired by Vercel', name:'Plain', lead:'Stark and confident: white, near-black text, one electric blue, Geist type with tight headlines. Maximum clarity, almost no decoration.', hex:'#FFFFFF ground · #FAFAFA card<br>#E5E5E5 line · #171717 text<br>#006BFF signature blue<br>Geist', brand:'Remote Wake', headline:'Your Mac stays awake.<br>You stay connected.', sub:'A plugged-in Mac with the lid closed, reachable from your phone. Free, private, open source.'},
+  brick: {tag:'OPTION F · inspired by Tailscale', name:'Brick', lead:'Warm off-white with a single brick red and light, airy Inter headlines. Friendly infrastructure: it matches the Tailscale ecosystem the app is built on.', hex:'#F9F7F6 paper · #FFFFFF card<br>#E3DED9 line · #181717 ink<br>#B83D37 signature brick<br>Inter Light headlines', brand:'Remote Wake', headline:'Close the lid.<br>Stay connected.', sub:'Your plugged-in Mac stays awake, and your phone can reach it from anywhere.'},
+  ember: {tag:'OPTION G · inspired by Raycast', name:'Ember', lead:'Dark, fast and a little bold: near-black with a hot coral-red accent and heavy Inter. Reads as a power-user tool you launch in a second.', hex:'#07080A ground · #0F1013 card<br>#26272D line · #F4F4F5 text<br>#FF6363 signature ember<br>Inter, bold', brand:'Remote Wake', headline:'Your Mac never sleeps.<br>Your phone never waits.', sub:'Lid closed, plugged in, one tap away. Free and private.'},
+  violet: {tag:'OPTION H · inspired by Stripe', name:'Violet', lead:'Polished and trustworthy: white with navy ink, a vivid violet accent, blue-grey shadows and rounded pill buttons. Feels like a finished product you would pay for.', hex:'#FFFFFF ground · #F6F9FC card<br>#E3E8EF line · #1A2B4A ink<br>#533AFD signature violet<br>Plus Jakarta Sans', brand:'Remote Wake', headline:'Reach your Mac,<br>wherever you are.', sub:'It stays awake while plugged in. Your phone opens a terminal on it in seconds.'}
+,
+  nord: {tag:'OPTION I · inspired by Nord', name:'Nord', lead:'Cool blue-grey twilight. Every surface is a soft step from the next and the text is a pale grey, never white. The classic low-glare terminal palette.', hex:'#2E3440 ground · #3B4252 card<br>#4C566A line · #D8DEE9 text<br>#88C0D0 signature frost<br>IBM Plex Sans', brand:'Remote Wake', headline:'Your Mac stays awake.<br>Quietly.', sub:'Plugged in, lid closed, reachable from your phone. Free and private.'},
+  mocha: {tag:'OPTION J · inspired by Catppuccin Mocha', name:'Mocha', lead:'Soft pastel on warm dark. Lavender accent, rounded Nunito titles, gentle surfaces. Cosy rather than techy.', hex:'#1E1E2E ground · #313244 card<br>#45475A line · #CDD6F4 text<br>#CBA6F7 signature mauve<br>Nunito', brand:'Remote Wake', headline:'Your cosy Mac,<br>always within reach.', sub:'It stays awake while plugged in, and your phone can step right in.'},
+  rose: {tag:'OPTION K · inspired by Rosé Pine', name:'Rosé', lead:'Dusky plum with a soft rose accent. Low glare, romantic, calm. DM Sans keeps it modern.', hex:'#232136 ground · #2A273F card<br>#44415A line · #E0DEF4 text<br>#EA9A97 signature rose<br>DM Sans', brand:'Remote Wake', headline:'Rest easy.<br>Your Mac is awake for you.', sub:'Close the lid, keep it plugged in, and reach it from anywhere.'},
+  latte: {tag:'OPTION L · inspired by Catppuccin Latte', name:'Latte', lead:'The light twin of Mocha: soft blue-grey surfaces, slate text instead of black, one friendly blue. Gentle on the eyes in daylight.', hex:'#EFF1F5 ground · #E6E9EF card<br>#CCD0DA line · #4C4F69 text<br>#1E66F5 signature blue<br>Nunito', brand:'Remote Wake', headline:'Your Mac, awake.<br>Your phone, in reach.', sub:'Plugged in with the lid closed, and one tap away. Free and private.'},
+  oat: {tag:'OPTION M · inspired by Notion', name:'Oat', lead:'Warm paper, brown-black text, quiet serif titles and one muted blue. Looks like a document, not an app. The lowest-key option here.', hex:'#F7F6F3 paper · #FFFFFF card<br>#E3E1DB line · #37352F ink<br>#2F6FB3 signature blue<br>Source Serif 4 + Inter', brand:'Remote Wake', headline:'A Mac that stays awake,<br>and a phone that can reach it.', sub:'Plug it in, close the lid, and open a terminal from anywhere. Free and private.'},
+  sage: {tag:'OPTION N · inspired by Headspace and Calm', name:'Sage', lead:'Misty green-grey with a deep sage accent, big radii and friendly Figtree. Calm and reassuring, ideal for non-technical users.', hex:'#EEF2EC ground · #F8FAF6 card<br>#D3DCCF line · #2F3A33 text<br>#4F7A5A signature sage<br>Figtree', brand:'Remote Wake', headline:'Let your Mac rest.<br>Stay connected.', sub:'It stays awake while plugged in, and your phone is always one tap away.'}
+,
+  sagedark: {tag:'OPTION N · dark mode', name:'Sage (dark)', lead:'The same sage, after dark: deep green-black surfaces, soft grey-green text, and a lighter sage accent so buttons keep their contrast. Same radii and Figtree type as light mode.', hex:'#151B17 ground · #1D2520 card<br>#2E3A33 line · #E4EBE5 text<br>#8FBF9A signature sage<br>Figtree', brand:'Remote Wake', headline:'Let your Mac rest.<br>Stay connected.', sub:'It stays awake while plugged in, and your phone is always one tap away.'}
+};
+for (const [id, d] of Object.entries(data)) {
+  const el = document.getElementById(id);
+  el.appendChild(document.getElementById('t').content.cloneNode(true));
+  el.querySelectorAll('[data-k]').forEach(n => n.innerHTML = d[n.dataset.k]);
+}
+</script>
+</body>
+</html>

@@ -6,6 +6,7 @@ import 'package:xterm/xterm.dart';
 import 'engine.dart';
 import 'native.dart';
 import 'store.dart';
+import 'theme.dart';
 
 // Interactive shell on the Mac: polls the Go engine for output, sends keystrokes back, with an extra-keys row for what phone keyboards lack.
 class TerminalPage extends StatefulWidget {
@@ -109,14 +110,40 @@ class _TerminalPageState extends State<TerminalPage> {
     Engine.shellWrite(id, base64.encode(utf8.encode(data)));
   }
 
-  Widget _key(String label, String data) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        child: OutlinedButton(
-          style: OutlinedButton.styleFrom(minimumSize: const Size(44, 40), padding: const EdgeInsets.symmetric(horizontal: 8)),
-          onPressed: () => _send(data),
-          child: Text(label),
+  Widget _key(BuildContext c, String label, {String? data, bool on = false, VoidCallback? onTap}) {
+    final s = c.sage;
+    return Padding(
+      padding: const EdgeInsets.only(right: Sp.sm),
+      child: Material(
+        color: on ? s.accent : s.soft,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: onTap ?? () => _send(data!),
+          child: Container(constraints: const BoxConstraints(minWidth: 44, minHeight: 44), alignment: Alignment.center, padding: const EdgeInsets.symmetric(horizontal: Sp.md),
+              child: Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: on ? s.onAccent : s.text))),
         ),
-      );
+      ),
+    );
+  }
+
+  // Terminal stays dark in both modes (programs assume a dark screen); colors come from the Sage palette.
+  static const _theme = TerminalTheme(
+    cursor: Color(0xFF8FBF9A), selection: Color(0xFF2E3A33), foreground: Color(0xFFE4EBE5), background: Color(0xFF151B17),
+    black: Color(0xFF1D2520), red: Color(0xFFE8A097), green: Color(0xFF8FBF9A), yellow: Color(0xFFE5C57A), blue: Color(0xFF8DB4D9), magenta: Color(0xFFC9A3D9), cyan: Color(0xFF7FC8C2), white: Color(0xFFCBD5CD),
+    brightBlack: Color(0xFF5E6B61), brightRed: Color(0xFFF2B8B0), brightGreen: Color(0xFFA8D4B2), brightYellow: Color(0xFFF0D894), brightBlue: Color(0xFFA6C8E8), brightMagenta: Color(0xFFDDBCE8), brightCyan: Color(0xFF9AD9D3), brightWhite: Color(0xFFE4EBE5),
+    searchHitBackground: Color(0xFFE5C57A), searchHitBackgroundCurrent: Color(0xFF8FBF9A), searchHitForeground: Color(0xFF151B17),
+  );
+
+  (String, Color) _tone(BuildContext c) {
+    final s = c.sage;
+    if (status.startsWith('connected')) return ('Connected', s.accent);
+    if (status.startsWith('failed') || status == 'disconnected' || status == 'host key changed') return (status.startsWith('failed') ? 'Failed' : (status == 'disconnected' ? 'Disconnected' : 'Key changed'), s.danger);
+    if (status == 'session ended') return ('Ended', s.muted);
+    if (status.startsWith('reconnecting')) return ('Reconnecting', s.warn);
+    if (status == 'waiting for approval') return ('Needs approval', s.warn);
+    return ('Connecting', s.muted);
+  }
 
   @override
   void dispose() {
@@ -127,61 +154,55 @@ class _TerminalPageState extends State<TerminalPage> {
   }
 
   @override
-  Widget build(BuildContext c) => Scaffold(
-        appBar: AppBar(title: Text('${widget.user}@${widget.name}', style: const TextStyle(fontSize: 14)), actions: [Padding(padding: const EdgeInsets.all(12), child: Text(status, key: const Key('tstatus'), style: const TextStyle(fontSize: 12)))]),
-        body: SafeArea(
-          child: Column(children: [
-            if (approveUrl != null)
-              Material(
-                color: Theme.of(c).colorScheme.tertiaryContainer,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: Row(children: [
-                    const Expanded(child: Text('Tailscale needs you to approve this connection (about every 12 hours).', key: Key('approve'))),
-                    FilledButton(onPressed: () => launchUrl(Uri.parse(approveUrl!), mode: LaunchMode.externalApplication), child: const Text('Approve')),
-                  ]),
-                ),
-              ),
-            if (reconnecting)
-              Material(
-                color: Theme.of(c).colorScheme.errorContainer,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: Row(children: [
-                    if (!gaveUp) const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text(gaveUp ? 'Connection lost' : 'Connection lost, reconnecting...', key: const Key('banner'))),
-                    if (gaveUp) TextButton(onPressed: () { attempt = 0; _reconnect(); }, child: const Text('Retry')),
-                  ]),
-                ),
-              ),
-            Expanded(child: TerminalView(term, autofocus: true, textStyle: const TerminalStyle(fontSize: 13))),
-            SingleChildScrollView(
+  Widget build(BuildContext c) {
+    final s = c.sage, tone = _tone(c);
+    return Scaffold(
+      appBar: AppBar(
+        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(widget.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+          Text('${widget.user}@${widget.ip}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: s.muted)),
+        ]),
+        actions: [Padding(padding: const EdgeInsets.only(right: Sp.lg), child: Center(child: StatusWord(tone.$1, tone.$2, key: const Key('tstatus'))))],
+      ),
+      body: SafeArea(
+        child: Column(children: [
+          if (approveUrl != null)
+            Banner2(
+              bg: s.warnBg, fg: s.warn, text: 'Tailscale needs you to approve this connection (about every 12 hours).',
+              action: FilledButton(onPressed: () => launchUrl(Uri.parse(approveUrl!), mode: LaunchMode.externalApplication), child: const Text('Approve')),
+            ),
+          if (reconnecting)
+            Banner2(
+              bg: s.dangerBg, fg: s.danger, text: gaveUp ? 'Connection lost' : 'Connection lost, reconnecting...',
+              lead: gaveUp ? null : SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: s.danger)),
+              action: gaveUp ? FilledButton(onPressed: () { attempt = 0; _reconnect(); }, child: const Text('Retry')) : null,
+            ),
+          const SizedBox(height: Sp.sm),
+          Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: Sp.sm), child: ClipRRect(borderRadius: BorderRadius.circular(12), child: TerminalView(term, autofocus: true, theme: _theme, padding: const EdgeInsets.all(Sp.sm), textStyle: const TerminalStyle(fontSize: 13))))),
+          Container(
+            color: s.card,
+            padding: const EdgeInsets.all(Sp.sm),
+            child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(children: [
-                _key('Esc', '\x1b'),
-                _key('Tab', '\t'),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: (ctrl ? FilledButton.new : OutlinedButton.new)(
-                    style: ButtonStyle(minimumSize: WidgetStateProperty.all(const Size(44, 40)), padding: WidgetStateProperty.all(const EdgeInsets.symmetric(horizontal: 8))),
-                    onPressed: () => setState(() => ctrl = !ctrl),
-                    child: const Text('Ctrl'),
-                  ),
-                ),
-                _key('^C', '\x03'),
-                _key('^D', '\x04'),
-                _key('↑', '\x1b[A'),
-                _key('↓', '\x1b[B'),
-                _key('←', '\x1b[D'),
-                _key('→', '\x1b[C'),
-                _key('|', '|'),
-                _key('/', '/'),
-                _key('-', '-'),
-                _key('~', '~'),
+                _key(c, 'Esc', data: '\x1b'),
+                _key(c, 'Tab', data: '\t'),
+                _key(c, 'Ctrl', on: ctrl, onTap: () => setState(() => ctrl = !ctrl)),
+                _key(c, '^C', data: '\x03'),
+                _key(c, '^D', data: '\x04'),
+                _key(c, '↑', data: '\x1b[A'),
+                _key(c, '↓', data: '\x1b[B'),
+                _key(c, '←', data: '\x1b[D'),
+                _key(c, '→', data: '\x1b[C'),
+                _key(c, '|', data: '|'),
+                _key(c, '/', data: '/'),
+                _key(c, '-', data: '-'),
+                _key(c, '~', data: '~'),
               ]),
             ),
-          ]),
-        ),
-      );
+          ),
+        ]),
+      ),
+    );
+  }
 }

@@ -94,117 +94,262 @@ func tsPath() -> String? { ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tails
     }
 }
 
-struct Row: View {
-    let k: String, v: String
-    var body: some View { HStack { Text(k).foregroundStyle(.secondary); Spacer(); Text(v).monospacedDigit() } }
+
+// MARK: - Sage design language (see design/tokens.md). Spacing uses only S.*; colors adapt to Light/Dark automatically.
+import CoreText
+
+extension Color { init(hex: UInt32) { self.init(red: Double((hex >> 16) & 255) / 255, green: Double((hex >> 8) & 255) / 255, blue: Double(hex & 255) / 255) } }
+func dyn(_ l: UInt32, _ d: UInt32) -> Color {
+    Color(nsColor: NSColor(name: nil) { a in a.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(Color(hex: d)) : NSColor(Color(hex: l)) })
+}
+enum T {
+    static let bg = dyn(0xEEF2EC, 0x151B17), card = dyn(0xF8FAF6, 0x1D2520), soft = dyn(0xDDE7DA, 0x24302A), line = dyn(0xD3DCCF, 0x2E3A33)
+    static let text = dyn(0x2F3A33, 0xE4EBE5), muted = dyn(0x5E6B61, 0x9BAB9F), accent = dyn(0x4F7A5A, 0x8FBF9A), onAccent = dyn(0xFFFFFF, 0x11201A)
+    static let warn = dyn(0x7A5A12, 0xE5C57A), warnBg = dyn(0xF6EBD3, 0x2B2616)
+}
+enum S { static let xs: CGFloat = 4, sm: CGFloat = 8, md: CGFloat = 12, lg: CGFloat = 16, xl: CGFloat = 24, xxl: CGFloat = 32 }
+func ff(_ size: CGFloat, _ w: Font.Weight = .regular) -> Font { .custom("Figtree", size: size).weight(w) }
+func registerFonts() { CTFontManagerRegisterFontsForURL(URL(fileURLWithPath: resRoot + "/Fonts/Figtree.ttf") as CFURL, .process, nil) }
+
+struct Card: ViewModifier {
+    var tint = false
+    func body(content: Content) -> some View {
+        content.padding(S.lg).frame(maxWidth: .infinity, alignment: .leading)
+            .background(tint ? T.soft : T.card, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(T.line, lineWidth: 1))
+    }
+}
+extension View { func card(tint: Bool = false) -> some View { modifier(Card(tint: tint)) } }
+
+struct Pill: ButtonStyle {
+    var primary = true
+    @Environment(\.isEnabled) var enabled
+    func makeBody(configuration c: Configuration) -> some View {
+        c.label.font(ff(14, .semibold)).padding(.horizontal, S.lg).frame(height: 36)
+            .foregroundStyle(primary ? T.onAccent : T.text)
+            .background(primary ? T.accent : Color.clear, in: Capsule())
+            .overlay(Capsule().stroke(primary ? Color.clear : T.line, lineWidth: 1))
+            .opacity(enabled ? (c.isPressed ? 0.8 : 1) : 0.45)
+    }
+}
+struct Quiet: ButtonStyle {
+    func makeBody(configuration c: Configuration) -> some View { c.label.font(ff(14, .medium)).foregroundStyle(T.muted).opacity(c.isPressed ? 0.6 : 1) }
 }
 
-// Interactive first-run tutorial: a live checklist with the real action buttons; each step ticks itself when done.
-// (The Android app has the same guide.) Reopen from "Tutorial" in the main window.
-struct Tutorial: View {
+struct Status: View {   // the one way status is shown everywhere: dot + word
+    let word: String, color: Color
+    var body: some View { HStack(spacing: S.sm) { Circle().fill(color).frame(width: 8, height: 8); Text(word).font(ff(13, .semibold)).foregroundStyle(color) } }
+}
+
+struct InfoRow<Trailing: View>: View {
+    let icon: String, label: String
+    @ViewBuilder var trailing: Trailing
+    var body: some View {
+        HStack(spacing: S.md) {
+            Image(systemName: icon).font(.system(size: 15)).foregroundStyle(T.muted).frame(width: 22)
+            Text(label).font(ff(15)).foregroundStyle(T.text)
+            Spacer(minLength: S.md)
+            trailing
+        }.frame(minHeight: 32)
+    }
+}
+func value(_ s: String) -> some View { Text(s).font(ff(15)).foregroundStyle(T.muted).lineLimit(1) }
+
+struct Logo: View {
+    var size: CGFloat = 36
+    var body: some View {
+        ZStack { RoundedRectangle(cornerRadius: size * 0.3).fill(T.accent); Image(systemName: "moon.zzz.fill").font(.system(size: size * 0.5)).foregroundStyle(T.onAccent) }.frame(width: size, height: size)
+    }
+}
+
+extension Model {
+    var ready: Bool { installed && tsState != "not installed" }
+    var awakeWord: (String, Color) { !running ? ("Off", T.muted) : (holding ? ("Awake", T.accent) : ("Waiting for AC", T.warn)) }
+    var heroTitle: String { !running ? "Stay awake is off" : (holding ? "Your Mac is staying awake" : "Ready, but on battery") }
+    var heroText: String { !running ? "Your Mac sleeps normally." : (holding ? "Safe to close the lid while it is plugged in." : "Plug in to keep it awake. On battery it sleeps normally.") }
+    var stayAwake: Binding<Bool> { Binding(get: { self.running }, set: { _ in self.toggle() }) }
+}
+
+struct TailscaleRow: View {
     @ObservedObject var m: Model
-    var close: () -> Void
-    var done: [Bool] { [m.installed && m.tsState != "not installed", m.tsState == "Running", m.running, !m.phones.isEmpty] }
+    var body: some View {
+        InfoRow(icon: "network", label: "Tailscale") {
+            if m.tsState == "Running" { value(m.tsIP) }
+            else if m.tsState == "NeedsLogin", let u = m.authURL, let url = URL(string: u) { Button("Sign in") { NSWorkspace.shared.open(url) }.buttonStyle(Pill()) }
+            else { Button("Connect") { m.connect() }.buttonStyle(Pill()) }
+        }
+    }
+}
+
+// MARK: - Main window
+
+struct StepRow<A: View>: View {
+    let n: Int, title: String, text: String, done: Bool, active: Bool
+    @ViewBuilder var action: A
+    var body: some View {
+        HStack(alignment: .top, spacing: S.md) {
+            ZStack {
+                Circle().fill(done ? T.accent : (active ? T.soft : Color.clear)).overlay(Circle().stroke(done ? Color.clear : T.line, lineWidth: 1))
+                if done { Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundStyle(T.onAccent) }
+                else { Text("\(n)").font(ff(13, .semibold)).foregroundStyle(active ? T.text : T.muted) }
+            }.frame(width: 28, height: 28)
+            VStack(alignment: .leading, spacing: S.sm) {
+                Text(title).font(ff(16, .semibold)).foregroundStyle(done || active ? T.text : T.muted).frame(minHeight: 28, alignment: .leading)
+                if active {
+                    Text(text).font(ff(14)).foregroundStyle(T.muted).fixedSize(horizontal: false, vertical: true)
+                    action
+                }
+            }
+        }
+    }
+}
+
+struct SetupView: View {
+    @ObservedObject var m: Model
+    var skip: () -> Void
+    var done: [Bool] { [m.ready, m.tsState == "Running", m.running] }
     var cur: Int { done.firstIndex(of: false) ?? -1 }
-    func step<A: View>(_ n: Int, _ title: String, _ text: String, @ViewBuilder _ action: () -> A) -> some View {
-            VStack(alignment: .leading, spacing: 6) {
-                Label("\(n + 1). \(title)", systemImage: done[n] ? "checkmark.circle.fill" : (n == cur ? "circle.inset.filled" : "circle"))
-                    .font(.headline).foregroundStyle(done[n] ? Color.green : (n == cur ? Color.primary : Color.secondary))
-                if n == cur {
-                    Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    action().disabled(m.busy)
-                }
-            }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
-             .background(n == cur ? Color.accentColor.opacity(0.12) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
-    }
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Set up Remote Wake").font(.title2.bold())
-            Text("Keeps this Mac awake while plugged in, lid closed too, and lets your Android phone open a terminal on it. Tailscale links them: private and free.")
-                .font(.callout).fixedSize(horizontal: false, vertical: true)
-            step(0, "Install", "Installs Tailscale and the stay-awake service. You'll be asked for your Mac password once.") { Button("Install") { m.install() } }
-            step(1, "Connect Tailscale", "Sign in with the account you'll also use on your phone.") {
-                if m.tsState == "NeedsLogin", let u = m.authURL, let url = URL(string: u) { Button("Sign in to Tailscale") { NSWorkspace.shared.open(url) } }
-                else { Button("Connect Tailscale") { m.connect() } }
+        VStack(alignment: .leading, spacing: S.lg) {
+            VStack(alignment: .leading, spacing: S.xs) {
+                Text("Let's get you set up").font(ff(20, .bold)).foregroundStyle(T.text)
+                Text("Three quick steps. Each one ticks itself when it's done.").font(ff(14)).foregroundStyle(T.muted)
             }
-            step(2, "Stay awake on AC", "Turn this on. On battery the Mac sleeps normally, so keep it plugged in.") {
-                Toggle("Stay awake on AC", isOn: Binding(get: { m.running }, set: { _ in m.toggle() })).toggleStyle(.switch)
-            }
-            step(3, "Set up your phone", "Copy the phone app to your Android phone and install it, open it, sign in to Tailscale with the same account, then tap this Mac. This step ticks when the phone shows up.") {
+            VStack(alignment: .leading, spacing: S.lg) {
+                StepRow(n: 1, title: "Install", text: "Adds Tailscale and the stay-awake service. You'll be asked for your Mac password once.", done: done[0], active: cur == 0) {
+                    Button("Install") { m.install() }.buttonStyle(Pill()).disabled(m.busy)
+                }
+                StepRow(n: 2, title: "Connect Tailscale", text: "Sign in with the account you'll also use on your phone.", done: done[1], active: cur == 1) {
+                    if m.tsState == "NeedsLogin", let u = m.authURL, let url = URL(string: u) { Button("Sign in to Tailscale") { NSWorkspace.shared.open(url) }.buttonStyle(Pill()) }
+                    else { Button("Connect Tailscale") { m.connect() }.buttonStyle(Pill()) }
+                }
+                StepRow(n: 3, title: "Stay awake on AC", text: "Turn this on. Keep the Mac plugged in; on battery it sleeps normally.", done: done[2], active: cur == 2) {
+                    Toggle("Stay awake on AC", isOn: m.stayAwake).toggleStyle(.switch).tint(T.accent).font(ff(14)).disabled(m.busy)
+                }
+            }.card()
+            HStack { Spacer(); Button("Skip setup") { skip() }.buttonStyle(Quiet()) }
+        }
+    }
+}
+
+struct PhoneCard: View {
+    @ObservedObject var m: Model
+    var body: some View {
+        if let ph = m.phones.first {
+            InfoRow(icon: "iphone", label: "Phone") { value(ph) }.card()
+        } else {
+            VStack(alignment: .leading, spacing: S.md) {
+                Text("Add your phone").font(ff(17, .semibold)).foregroundStyle(T.text)
+                Text("1. Install the phone app on your Android phone.\n2. Open it and sign in to Tailscale with the same account.\n3. Tap this Mac in the list.")
+                    .font(ff(14)).foregroundStyle(T.muted).lineSpacing(S.xs).fixedSize(horizontal: false, vertical: true)
                 if FileManager.default.fileExists(atPath: resRoot + "/RemoteWake.apk") {
-                    Button("Show phone app in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: resRoot + "/RemoteWake.apk")]) }
+                    Button("Show phone app in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: resRoot + "/RemoteWake.apk")]) }.buttonStyle(Pill())
                 }
-            }
-            Text("Good to know").font(.headline).padding(.top, 4)
-            Text("• About every 12 hours Tailscale asks the phone to approve a connection in the browser; the phone app shows an Approve button.\n• If the connection drops the phone reconnects, but running programs stop. Use tmux to keep them.\n• After a power cut with FileVault on, this Mac waits for its password at startup and can't be reached until unlocked.\n• The moon icon in the menu bar stays when you close this window or quit the app.")
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            HStack { Spacer(); Button(cur == -1 ? "Done" : "Skip for now") { close() }.keyboardShortcut(.defaultAction) }
-        }.padding(20).frame(width: 400)
+            }.card()
+        }
     }
 }
 
-// Main window: tutorial on first run, then the panel.
-struct Root: View {
-    @ObservedObject var m: Model
-    @AppStorage("tutorialSeen") var seen = false
-    @State private var showing = false
+struct HelpSheet: View {
+    var close: () -> Void
+    let tips = [("clock.arrow.circlepath", "About every 12 hours Tailscale asks your phone to approve a connection in the browser. The phone app shows an Approve button."),
+                ("arrow.triangle.2.circlepath", "If the connection drops, the phone reconnects, but programs that were running stop. Use tmux to keep them."),
+                ("lock.shield", "After a power cut with FileVault on, this Mac waits for its password at startup and cannot be reached until someone unlocks it."),
+                ("menubar.rectangle", "The moon icon in the menu bar stays when you close this window or quit the app.")]
     var body: some View {
-        Group {
-            if showing { Tutorial(m: m) { seen = true; showing = false } }
-            else { VStack(spacing: 0) { Panel(m: m); Button("Tutorial") { showing = true }.buttonStyle(.link).padding(.bottom, 10) } }
-        }.onAppear { showing = !seen }
-    }
-}
-
-struct Panel: View {
-    @ObservedObject var m: Model
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if !m.installed || m.tsState == "not installed" {
-                Text("Set up Remote Wake").font(.headline)
-                Text("Installs Tailscale and a small background service that keeps this Mac awake while it is plugged in, so you can reach it from your phone. You'll be asked for your Mac password once.")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Button("Install") { m.install() }.disabled(m.busy)
-            } else {
-                Toggle(isOn: Binding(get: { m.running }, set: { _ in m.toggle() })) {
-                    Text("Stay awake on AC").font(.headline)
-                }.toggleStyle(.switch).disabled(m.busy)
-                Text(!m.running ? "Off: the Mac sleeps normally"
-                     : m.holding ? "On: awake, lid closed too" : "On, but on battery: the Mac sleeps normally")
-                    .font(.caption).foregroundStyle(m.running && m.holding ? .green : .secondary)
-                Divider()
-                Row(k: "Power", v: m.onAC ? "AC" : "Battery")
-                Row(k: "Tailscale", v: m.tsState == "Running" ? m.tsIP : m.tsState)
-                if m.tsState == "NeedsLogin", let u = m.authURL, let url = URL(string: u) {
-                    Button("Sign in to Tailscale") { NSWorkspace.shared.open(url) }
-                } else if m.tsState != "Running" {
-                    Button("Connect Tailscale") { m.connect() }
-                }
-            }
-            if m.tsState == "Running" {
-                Divider()
-                if let ph = m.phones.first {
-                    Row(k: "Phone", v: ph)
-                } else {
-                    Text("Next: set up your phone").font(.headline)
-                    Text("1. Copy the phone app to your Android phone (cable, Drive, or email it to yourself) and open it; allow installs from that source.\n2. Open Remote Wake there and sign in to Tailscale with the same account as this Mac.\n3. Tap this Mac in the list.")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    if let apk = Optional(URL(fileURLWithPath: resRoot + "/RemoteWake.apk")).flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil } {
-                        Button("Show phone app in Finder") { NSWorkspace.shared.activateFileViewerSelecting([apk]) }
+        VStack(alignment: .leading, spacing: S.lg) {
+            Text("Good to know").font(ff(20, .bold)).foregroundStyle(T.text)
+            VStack(alignment: .leading, spacing: S.md) {
+                ForEach(0..<tips.count, id: \.self) { i in
+                    HStack(alignment: .top, spacing: S.md) {
+                        Image(systemName: tips[i].0).font(.system(size: 15)).foregroundStyle(T.accent).frame(width: 22)
+                        Text(tips[i].1).font(ff(14)).foregroundStyle(T.text).fixedSize(horizontal: false, vertical: true)
                     }
                 }
-            }
-            if let e = m.error { Text(e).font(.caption).foregroundStyle(.red) }
-            Divider()
-            if isHelper {
-                Button("Open Remote Wake") { NSWorkspace.shared.openApplication(at: mainAppURL, configuration: .init()) }
-            }
-            HStack { Button("Refresh") { m.refresh() }; Spacer(); Button(isHelper ? "Quit menu icon" : "Quit") { NSApplication.shared.terminate(nil) } }
-        }.padding(12).frame(width: 300)
+            }.card()
+            HStack { Spacer(); Button("Done") { close() }.buttonStyle(Pill()).keyboardShortcut(.defaultAction) }
+        }.padding(S.xl).frame(width: 440).background(T.bg)
     }
 }
 
-// Main app: make sure the menu bar helper is registered for login and running now.
+struct MainView: View {
+    @ObservedObject var m: Model
+    @AppStorage("setupDone") var setupDone = false
+    @State private var help = false
+    var allDone: Bool { m.ready && m.tsState == "Running" && m.running }
+    var body: some View {
+        VStack(alignment: .leading, spacing: S.xl) {
+            HStack(spacing: S.md) {
+                Logo()
+                Text("Remote Wake").font(ff(24, .bold)).foregroundStyle(T.text)
+                Spacer()
+                Button("Help") { help = true }.buttonStyle(Quiet())
+            }
+            if !setupDone {
+                SetupView(m: m) { setupDone = true }
+            } else {
+                VStack(alignment: .leading, spacing: S.lg) {
+                    HStack(alignment: .center, spacing: S.lg) {
+                        VStack(alignment: .leading, spacing: S.xs) {
+                            Text(m.heroTitle).font(ff(18, .bold)).foregroundStyle(T.text)
+                            Text(m.heroText).font(ff(14)).foregroundStyle(T.muted).fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: S.md)
+                        Toggle("Stay awake on AC", isOn: m.stayAwake).labelsHidden().toggleStyle(.switch).tint(T.accent).disabled(m.busy)
+                    }
+                    Status(word: m.awakeWord.0, color: m.awakeWord.1)
+                }.card(tint: m.running && m.holding)
+                VStack(alignment: .leading, spacing: S.md) {
+                    InfoRow(icon: m.onAC ? "powerplug.fill" : "battery.50", label: "Power") { value(m.onAC ? "Plugged in" : "On battery") }
+                    Divider().overlay(T.line)
+                    TailscaleRow(m: m)
+                }.card()
+                PhoneCard(m: m)
+            }
+            if let e = m.error { Text(e).font(ff(13)).foregroundStyle(T.warn).padding(S.md).frame(maxWidth: .infinity, alignment: .leading).background(T.warnBg, in: RoundedRectangle(cornerRadius: 8)) }
+        }
+        .padding(S.xl).frame(width: 440).background(T.bg)
+        .onChange(of: allDone) { if $0 { setupDone = true } }
+        .onAppear { if allDone { setupDone = true } }
+        .sheet(isPresented: $help) { HelpSheet { help = false } }
+    }
+}
+
+// MARK: - Menu bar panel (compact, same language)
+
+struct MenuView: View {
+    @ObservedObject var m: Model
+    var body: some View {
+        VStack(alignment: .leading, spacing: S.lg) {
+            HStack(spacing: S.md) {
+                Logo(size: 28)
+                Text("Remote Wake").font(ff(16, .bold)).foregroundStyle(T.text)
+                Spacer()
+                Status(word: m.awakeWord.0, color: m.awakeWord.1)
+            }
+            if !m.ready || m.tsState != "Running" {
+                Text("Finish setting up in the app.").font(ff(14)).foregroundStyle(T.muted)
+            } else {
+                VStack(alignment: .leading, spacing: S.md) {
+                    InfoRow(icon: "moon.zzz", label: "Stay awake") { Toggle("Stay awake on AC", isOn: m.stayAwake).labelsHidden().toggleStyle(.switch).tint(T.accent).disabled(m.busy) }
+                    Divider().overlay(T.line)
+                    InfoRow(icon: m.onAC ? "powerplug.fill" : "battery.50", label: "Power") { value(m.onAC ? "Plugged in" : "On battery") }
+                    InfoRow(icon: "network", label: "Tailscale") { value(m.tsIP) }
+                    InfoRow(icon: "iphone", label: "Phone") { value(m.phones.first ?? "Not set up") }
+                }.card()
+            }
+            if let e = m.error { Text(e).font(ff(13)).foregroundStyle(T.warn) }
+            HStack {
+                Button("Open Remote Wake") { NSWorkspace.shared.openApplication(at: mainAppURL, configuration: .init()) }.buttonStyle(Pill(primary: !m.ready || m.tsState != "Running"))
+                Spacer()
+                Button("Quit menu icon") { NSApplication.shared.terminate(nil) }.buttonStyle(Quiet())
+            }
+        }.padding(S.lg).frame(width: 320).background(T.bg)
+    }
+}
+
+// MARK: - App
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ n: Notification) {
         guard !isHelper else { return }
@@ -221,8 +366,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 struct MenuApp: App {
     @StateObject var m = Model()
+    init() { registerFonts() }
     var body: some Scene {
-        MenuBarExtra("Remote Wake", systemImage: m.running ? "moon.zzz.fill" : "moon.zzz") { Panel(m: m) }
+        MenuBarExtra("Remote Wake", systemImage: m.running ? "moon.zzz.fill" : "moon.zzz") { MenuView(m: m) }
             .menuBarExtraStyle(.window)
     }
 }
@@ -230,8 +376,9 @@ struct MenuApp: App {
 struct MainApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject var m = Model()
+    init() { registerFonts() }
     var body: some Scene {
-        Window("Remote Wake", id: "main") { Root(m: m) }.windowResizability(.contentSize)
+        Window("Remote Wake", id: "main") { MainView(m: m) }.windowResizability(.contentSize)
     }
 }
 
