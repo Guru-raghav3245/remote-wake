@@ -50,12 +50,14 @@ set -g status-right ""
 set -g history-limit 20000
 set -g default-terminal "screen-256color"
 set -sg escape-time 10
+set -g mouse on
 """
 func tmux(_ a: [String]) -> Int32 { run(tmuxBin, ["-L", tmuxSock] + a).status }
 func phoneEnabled() -> Bool { ((try? String(contentsOfFile: zshrc, encoding: .utf8)) ?? "").contains(zMark.0) }
 func tmuxUp() -> Bool { FileManager.default.isExecutableFile(atPath: tmuxBin) && tmux(["has-session", "-t", "phone"]) == 0 }
 func startTmux() {
     guard FileManager.default.isExecutableFile(atPath: tmuxBin), !tmuxUp() else { return }
+    try? tmuxConf.write(toFile: phoneDir + "/tmux.conf", atomically: true, encoding: .utf8)   // so a new app version's settings apply at the next start
     let p = Process(); p.executableURL = URL(fileURLWithPath: tmuxBin)
     p.arguments = ["-u", "-L", tmuxSock, "-f", phoneDir + "/tmux.conf", "-D"]   // bare -D: with a command (even start-server) tmux daemonizes a new server in the Background session instead
     p.standardInput = FileHandle.nullDevice; p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
@@ -77,6 +79,18 @@ func setPhone(_ on: Bool) {
     if on { startTmux() }
 }
 
+// Phone terminals run under the helper (the tmux server is its child), so macOS asks for access in the helper's name, on the Mac's screen,
+// where nobody is when you are away. The helper reports whether it has Full Disk Access in a file the main app reads.
+// Full Disk Access cannot be requested by code: the user adds the helper app in System Settings (the main app opens it).
+let permFile = phoneDir + "/perms.json"
+let permNames = ["disk": "Full Disk Access"]
+func permStatus() -> [String: Bool] {
+    let fd = open("/Library/Application Support/com.apple.TCC/TCC.db", O_RDONLY)   // readable only with Full Disk Access
+    if fd >= 0 { close(fd) }
+    return ["disk": fd >= 0]
+}
+let permText = "Programs you run from your phone may need to read your files (Desktop, Documents, Downloads...), and macOS only asks on this Mac's screen. Allow it now: switch on \"Remote Wake Menu\" in the Full Disk Access list that opens."
+
 func tsPath() -> String? { ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tailscale"].first { FileManager.default.isExecutableFile(atPath: $0) } }
 
 @MainActor final class Model: ObservableObject {
@@ -90,18 +104,22 @@ func tsPath() -> String? { ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tails
     @Published var phones: [String] = []   // Android devices already on the tailnet (name, with " (offline)" if so)
     @Published var phoneOn = false     // the .zshrc block is there
     @Published var tmuxRunning = false
+    @Published var perms: [String: Bool] = [:]   // written by the helper
     @Published var busy = false
     @Published var error: String?
     var timer: Timer?
     var tmuxStarting = false
 
-    init() { refresh(); timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in Task { @MainActor in self.refresh() } } }
+    init() {
+        refresh(); timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in Task { @MainActor in self.refresh() } } }
 
     func refresh() {
         installed = FileManager.default.fileExists(atPath: plist)
         running = run("/bin/launchctl", ["print", "system/\(label)"]).status == 0
         onAC = run("/usr/bin/pmset", ["-g", "batt"]).out.contains("AC Power")
         holding = run("/usr/bin/pmset", ["-g", "assertions"]).out.range(of: #"PreventSystemSleep\s+1"#, options: .regularExpression) != nil
+        if isHelper { try? FileManager.default.createDirectory(atPath: phoneDir, withIntermediateDirectories: true); try? JSONSerialization.data(withJSONObject: permStatus()).write(to: URL(fileURLWithPath: permFile)) }
+        perms = (try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: permFile)))) as? [String: Bool] ?? [:]
         phoneOn = phoneEnabled(); tmuxRunning = phoneOn && tmuxUp()
         if isHelper && phoneOn && !tmuxRunning && !tmuxStarting { tmuxStarting = true; Task.detached { startTmux(); await MainActor.run { self.tmuxStarting = false } } }   // at login, or if it died
         let hasDaemon = ["/usr/local/bin/tailscaled", "/opt/homebrew/bin/tailscaled"].contains { FileManager.default.isExecutableFile(atPath: $0) }
@@ -221,6 +239,12 @@ struct Logo: View {
 }
 
 extension Model {
+    var needsPerms: Bool { FileManager.default.fileExists(atPath: resRoot + "/tmux/tmux") }
+    var permsOK: Bool { !needsPerms || (!perms.isEmpty && !perms.values.contains(false)) }
+    var permsMissing: String { permNames.filter { perms[$0.key] != true }.map { $0.value }.sorted().joined(separator: ", ") }
+    func grantAccess() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
+    }
     var ready: Bool { installed && tsState != "not installed" }
     var awakeWord: (String, Color) { !running ? ("Off", T.muted) : (holding ? ("Awake", T.accent) : ("Waiting for AC", T.warn)) }
     var heroTitle: String { !running ? "Stay awake is off" : (holding ? "Your Mac is staying awake" : "Ready, but on battery") }
@@ -265,13 +289,13 @@ struct StepRow<A: View>: View {
 struct SetupView: View {
     @ObservedObject var m: Model
     var skip: () -> Void
-    var done: [Bool] { [m.ready, m.tsState == "Running", m.running] }
+    var done: [Bool] { [m.ready, m.tsState == "Running", m.running] + (m.needsPerms ? [m.permsOK] : []) }
     var cur: Int { done.firstIndex(of: false) ?? -1 }
     var body: some View {
         VStack(alignment: .leading, spacing: S.lg) {
             VStack(alignment: .leading, spacing: S.xs) {
                 Text("Let's get you set up").font(ff(20, .bold)).foregroundStyle(T.text)
-                Text("Three quick steps. Each one ticks itself when it's done.").font(ff(14)).foregroundStyle(T.muted)
+                Text("A few quick steps. Each one ticks itself when it's done.").font(ff(14)).foregroundStyle(T.muted)
             }
             VStack(alignment: .leading, spacing: S.lg) {
                 StepRow(n: 1, title: "Install", text: "Adds Tailscale and the stay-awake service. You'll be asked for your Mac password once.", done: done[0], active: cur == 0) {
@@ -283,6 +307,11 @@ struct SetupView: View {
                 }
                 StepRow(n: 3, title: "Stay awake on AC", text: "Turn this on. Keep the Mac plugged in; on battery it sleeps normally.", done: done[2], active: cur == 2) {
                     Toggle("Stay awake on AC", isOn: m.stayAwake).toggleStyle(.switch).tint(T.accent).font(ff(14)).disabled(m.busy)
+                }
+                if m.needsPerms {
+                    StepRow(n: 4, title: "Allow phone access", text: permText, done: m.permsOK, active: cur == 3) {
+                        Button("Allow access") { m.grantAccess() }.buttonStyle(Pill())
+                    }
                 }
             }.card()
             HStack { Spacer(); Button("Skip setup") { skip() }.buttonStyle(Quiet()) }
@@ -303,6 +332,20 @@ struct PhoneCard: View {
                 if FileManager.default.fileExists(atPath: resRoot + "/RemoteWake.apk") {
                     Button("Show phone app in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: resRoot + "/RemoteWake.apk")]) }.buttonStyle(Pill())
                 }
+            }.card()
+        }
+    }
+}
+
+struct PermsCard: View {
+    @ObservedObject var m: Model
+    var body: some View {
+        if m.needsPerms && !m.permsOK {
+            VStack(alignment: .leading, spacing: S.md) {
+                Text("Allow phone access").font(ff(17, .semibold)).foregroundStyle(T.text)
+                Text(permText).font(ff(14)).foregroundStyle(T.muted).fixedSize(horizontal: false, vertical: true)
+                if !m.perms.isEmpty { Status(word: "Still needed: " + m.permsMissing, color: T.warn) }
+                Button("Allow access") { m.grantAccess() }.buttonStyle(Pill())
             }.card()
         }
     }
@@ -356,7 +399,7 @@ struct MainView: View {
     @ObservedObject var m: Model
     @AppStorage("setupDone") var setupDone = false
     @State private var help = false
-    var allDone: Bool { m.ready && m.tsState == "Running" && m.running }
+    var allDone: Bool { m.ready && m.tsState == "Running" && m.running && m.permsOK }
     var body: some View {
         VStack(alignment: .leading, spacing: S.xl) {
             HStack(spacing: S.md) {
@@ -386,6 +429,7 @@ struct MainView: View {
                 }.card()
                 PhoneCard(m: m)
                 PhoneSessionsCard(m: m)
+                PermsCard(m: m)
             }
             if let e = m.error { Text(e).font(ff(13)).foregroundStyle(T.warn).padding(S.md).frame(maxWidth: .infinity, alignment: .leading).background(T.warnBg, in: RoundedRectangle(cornerRadius: 8)) }
         }

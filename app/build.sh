@@ -23,7 +23,7 @@ cat > "$A/Contents/Info.plist" <<P
 P
 H="$A/Contents/Library/LoginItems/Remote Wake Menu.app"; mkdir -p "$H/Contents/MacOS"
 cp "$A/Contents/MacOS/RemoteWake" "$H/Contents/MacOS/"
-sed -e 's/menu<\/string>/menu.helper<\/string>/' -e 's/<key>LSMinimumSystemVersion/<key>LSUIElement<\/key><true\/><key>LSMinimumSystemVersion/' "$A/Contents/Info.plist" > "$H/Contents/Info.plist"
+sed -e 's/menu<\/string>/menu.helper<\/string>/' -e 's/<string>Remote Wake<\/string>/<string>Remote Wake Menu<\/string>/' -e 's/<key>LSMinimumSystemVersion/<key>LSUIElement<\/key><true\/><key>LSMinimumSystemVersion/' "$A/Contents/Info.plist" > "$H/Contents/Info.plist"
 codesign --force -s - "$H"
 codesign --force -s - "$A"
 rm -f "Remote Wake.dmg" build/rw.dmg
