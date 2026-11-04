@@ -169,6 +169,12 @@ Question: can a phone app embed the Tailscale engine (no VpnService, no root) an
 - Not tested: a locked screen + fresh phone login (keychain should stay open), after a reboot/login (helper start), turning it off, a `.zshrc` that is a symlink, Intel Macs (arm64 only), the `claude` login surviving a long idle.
 - Left over: the old test tmux session `rwtest` (default socket) was killed; Homebrew `tmux` stays installed (`brew uninstall tmux` if unwanted).
 
+### Status snapshot (4 Nov 2026)
+- Released: v0.1.0 (DMG + APK on GitHub, site live). NOT in v0.1.0 and only committed locally/on main: Phone sessions (tmux) and the xterm patch. Next release v0.2.0 must: rebuild DMG + APK, upload them, update the two sha256 values and version text in `site/index.html`, then `cd site && vercel deploy --prod --yes` (the FAQ about Phone sessions is already in `site/index.html` but must not go live before the release). Deploy only after the release exists.
+- Built and tested on the real Mac and phone: stay-awake daemon, bundled Tailscale, Android terminal with reconnect and host-key pinning, Sage UI (dark seen; light not), Phone sessions.
+- Still untested: overnight and 10-minute lid-closed runs with the real daemon, FileVault/power loss, locked screen + fresh phone login with Phone sessions, reboot (helper and tmux start at login), Phone sessions off, bash users, Intel Macs (app is arm64 only), screen-off unplugged 10+ min on the phone, Gboard typing, rotation, DERP relay, Approve button with a real browser.
+- User's cleanup list: revoke the `wakeprobe apns` key and delete the test App IDs/App Group in the Apple portal, switch Xcode back to the personal account, delete stale Tailscale nodes, back up `~/.remote-wake-android.jks`, `.p8` deletion only when the user says so. Decisions open: SSH rule check vs accept, purge of old GitHub commits, paid signing (Developer ID $99, Play Store $25).
+
 ### Spec rewritten (2 Nov 2026)
 `Remote Wake for Mac Product Spec v3.md` describes the current design (stay awake on AC, bundled Tailscale + SSH, Android app, what is validated, risks, costs, open decisions, cleanup). The old `... Spec v2.md` (wake loop + cloud) is kept untouched for history; `... v2.0 (backup).md` too. The tailnet's SSH policy lists `root` as an allowed user (seen in `tailscale debug netmap`): the app only offers the user typed in, but tighten the rule if that matters.
 
