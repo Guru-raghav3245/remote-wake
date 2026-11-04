@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:isolate';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:xterm/xterm.dart';
@@ -8,7 +9,18 @@ import 'native.dart';
 import 'store.dart';
 import 'theme.dart';
 
-// Interactive shell on the Mac: polls the Go engine for output, sends keystrokes back, with an extra-keys row for what phone keyboards lack.
+// Waits for output in a background isolate (blocking call into the engine) and posts it to the UI the moment it arrives; no timer polling.
+void _reader(List<Object> a) {
+  final port = a[0] as SendPort, id = a[1] as int;
+  while (true) {
+    Engine.shellWait(id, 1000);
+    final b = Engine.shellRead(id);
+    if (b.isNotEmpty) port.send(b);
+    if (!Engine.shellAlive(id)) { port.send(null); return; }
+  }
+}
+
+// Interactive shell on the Mac: gets output from the Go engine, sends keystrokes back, with an extra-keys row for what phone keyboards lack.
 class TerminalPage extends StatefulWidget {
   final String name, ip, user;
   const TerminalPage({super.key, required this.name, required this.ip, required this.user});
@@ -21,7 +33,7 @@ class _TerminalPageState extends State<TerminalPage> {
   int id = -1;
   String status = 'connecting...';
   bool ctrl = false;
-  Timer? poll;
+  ReceivePort? rp;
   bool reconnecting = false, gaveUp = false;
   int attempt = 0;
   String? seenUrl; // the engine keeps the last banner; only a NEW link means a new approval is needed
@@ -60,17 +72,25 @@ class _TerminalPageState extends State<TerminalPage> {
     if (reconnecting) term.write('\r\n[reconnected: programs outside a phone session were stopped]\r\n');
     reconnecting = false; gaveUp = false; attempt = 0;
     setState(() => status = 'connected in ${sw.elapsedMilliseconds} ms');
-    poll = Timer.periodic(const Duration(milliseconds: 40), (_) {
-      final b64 = Engine.shellRead(id);
-      if (b64.isNotEmpty) { try { term.write(utf8.decode(base64.decode(b64), allowMalformed: true)); } catch (e) { debugPrint('terminal parse error: $e'); } }   // a bad escape sequence must not stop the screen
-      if (!Engine.shellAlive(id)) {
-        poll?.cancel();
-        final dropped = Engine.shellDropped(id);
-        Engine.shellClose(id);
-        id = -1;
-        if (dropped) { _reconnect(); } else { setState(() => status = 'session ended'); }
+    rp = ReceivePort();
+    rp!.listen((m) {
+      if (m is String) {
+        try { term.write(utf8.decode(base64.decode(m), allowMalformed: true)); } catch (e) { debugPrint('terminal parse error: $e'); }   // a bad escape sequence must not stop the screen
+      } else {
+        _ended();
       }
     });
+    await Isolate.spawn(_reader, [rp!.sendPort, id]);
+  }
+
+  Future<void> _ended() async {
+    rp?.close(); rp = null;
+    await Future.delayed(const Duration(milliseconds: 200));   // the engine notes "connection lost" a moment after the output ends
+    if (!mounted || id <= 0) return;
+    final dropped = Engine.shellDropped(id);
+    Engine.shellClose(id);
+    id = -1;
+    if (dropped) { _reconnect(); } else { setState(() => status = 'session ended'); }
   }
 
   // The connection dropped: keep the screen, retry with a growing pause (2,4,8,15 s ...), give up after 10 tries (button to retry).
@@ -148,7 +168,7 @@ class _TerminalPageState extends State<TerminalPage> {
   @override
   void dispose() {
     Native.stop();
-    poll?.cancel();
+    rp?.close();
     if (id > 0) Engine.shellClose(id);
     super.dispose();
   }

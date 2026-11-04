@@ -50,7 +50,8 @@ class _HomeState extends State<Home> {
 
   Future<void> _start() async {
     final d = await getApplicationSupportDirectory();
-    final err = Engine.start(d.path);
+    final host = (await Native.deviceName()).toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-+|-+$'), '');
+    final err = Engine.start(d.path, host: host.isEmpty ? 'phone' : host);
     if (err.isNotEmpty && mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
   }
 

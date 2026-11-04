@@ -5,5 +5,7 @@ class Native {
   static const _c = MethodChannel('rw/native');
   static Future<void> start(String text) => _c.invokeMethod('start', {'text': text});
   static Future<void> stop() => _c.invokeMethod('stop');
+  // the name the user gave the phone (Settings > About), as a Tailscale-safe host name
+  static Future<String> deviceName() async => (await _c.invokeMethod<String>('deviceName')) ?? 'phone';
   static Future<bool> batteryExempt() async => (await _c.invokeMethod<bool>('batteryExempt')) ?? false;
 }

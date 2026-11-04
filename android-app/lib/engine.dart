@@ -9,9 +9,9 @@ final _free = _lib.lookupFunction<Void Function(Pointer<Utf8>), void Function(Po
 
 String _take(Pointer<Utf8> p) { final s = p.toDartString(); _free(p); return s; }
 
-String _start(String dir, String key) {
-  final f = _lib.lookupFunction<Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>), Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>)>('rw_start');
-  return using((a) => _take(f(dir.toNativeUtf8(allocator: a), key.toNativeUtf8(allocator: a))));
+String _start(String dir, String key, String host) {
+  final f = _lib.lookupFunction<Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>), Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>)>('rw_start');
+  return using((a) => _take(f(dir.toNativeUtf8(allocator: a), key.toNativeUtf8(allocator: a), host.toNativeUtf8(allocator: a))));
 }
 
 String _state() =>
@@ -39,6 +39,8 @@ class Engine {
   static String lastError() =>
       _take(_lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>('rw_last_error')());
   static String shellRead(int id) => _take(_lib.lookupFunction<Pointer<Utf8> Function(Int32), Pointer<Utf8> Function(int)>('rw_shell_read')(id));
+  /// Blocks (call it off the UI isolate) until output is waiting, the shell ended, or [ms] passed.
+  static void shellWait(int id, int ms) => _lib.lookupFunction<Void Function(Int32, Int32), void Function(int, int)>('rw_shell_wait')(id, ms);
   static bool shellAlive(int id) => _lib.lookupFunction<Int32 Function(Int32), int Function(int)>('rw_shell_alive')(id) == 1;
   static bool shellDropped(int id) => _lib.lookupFunction<Int32 Function(Int32), int Function(int)>('rw_shell_dropped')(id) == 1;
   static void shellWrite(int id, String b64) => using((a) => _lib
@@ -47,7 +49,7 @@ class Engine {
       _lib.lookupFunction<Void Function(Int32, Int32, Int32), void Function(int, int, int)>('rw_shell_resize')(id, cols, rows);
   static void shellClose(int id) => _lib.lookupFunction<Void Function(Int32), void Function(int)>('rw_shell_close')(id);
 
-  static String start(String dir, {String authKey = ''}) => _start(dir, authKey);
+  static String start(String dir, {String authKey = '', String host = 'phone'}) => _start(dir, authKey, host);
   static Map<String, dynamic> state() => jsonDecode(_state()) as Map<String, dynamic>;
   // blocking Go calls run off the UI isolate
   static Future<String> exec(String addr, String user, String cmd) => Isolate.run(() => _exec(addr, user, cmd));

@@ -56,7 +56,7 @@ var (
 )
 
 //export rw_start
-func rw_start(stateDir, authKey *C.char) *C.char {
+func rw_start(stateDir, authKey, hostname *C.char) *C.char {
 	mu.Lock()
 	defer mu.Unlock()
 	if srv != nil {
@@ -66,7 +66,7 @@ func rw_start(stateDir, authKey *C.char) *C.char {
 	// when it cannot find a cache dir. Point both at the app's own directory.
 	os.Setenv("HOME", C.GoString(stateDir))
 	os.Setenv("XDG_CACHE_HOME", C.GoString(stateDir))
-	s := &tsnet.Server{Dir: C.GoString(stateDir), Hostname: "rw-phone", AuthKey: C.GoString(authKey)}
+	s := &tsnet.Server{Dir: C.GoString(stateDir), Hostname: C.GoString(hostname), AuthKey: C.GoString(authKey)}
 	if err := s.Start(); err != nil {
 		return C.CString("ERROR: " + err.Error())
 	}
@@ -160,6 +160,7 @@ type shell struct {
 	buf     []byte
 	done    bool
 	dropped bool // connection lost (not a normal exit)
+	ready   chan struct{} // poked when output arrives or the shell ends, so rw_shell_wait can return at once
 }
 
 var (
@@ -235,7 +236,7 @@ func rw_shell_open(addr, user, pinned *C.char, cols, rows C.int) C.int {
 		cl.Close()
 		return fail(err)
 	}
-	sh := &shell{cl: cl, sess: sess, in: in}
+	sh := &shell{cl: cl, sess: sess, in: in, ready: make(chan struct{}, 1)}
 	go func() {
 		b := make([]byte, 32*1024)
 		for {
@@ -246,6 +247,10 @@ func rw_shell_open(addr, user, pinned *C.char, cols, rows C.int) C.int {
 				sh.done = true
 			}
 			sh.mu.Unlock()
+			select {
+			case sh.ready <- struct{}{}:
+			default:
+			}
 			if err != nil {
 				return
 			}
@@ -302,6 +307,26 @@ func rw_shell_read(id C.int) *C.char {
 	sh.buf = nil
 	sh.mu.Unlock()
 	return C.CString(base64.StdEncoding.EncodeToString(b))
+}
+
+// Blocks until output is waiting, the shell ended, or ms elapsed. Lets the app react to output at once instead of polling on a timer.
+//
+//export rw_shell_wait
+func rw_shell_wait(id, ms C.int) {
+	sh := getShell(id)
+	if sh == nil {
+		return
+	}
+	sh.mu.Lock()
+	has := len(sh.buf) > 0 || sh.done
+	sh.mu.Unlock()
+	if has {
+		return
+	}
+	select {
+	case <-sh.ready:
+	case <-time.After(time.Duration(ms) * time.Millisecond):
+	}
 }
 
 //export rw_shell_alive

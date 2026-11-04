@@ -20,6 +20,7 @@ class MainActivity : FlutterActivity() {
                     startForegroundService(Intent(this, KeepAliveService::class.java).putExtra("text", call.argument<String>("text")))
                     result.success(null)
                 }
+                "deviceName" -> result.success(Settings.Global.getString(contentResolver, "device_name") ?: "${Build.MANUFACTURER} ${Build.MODEL}")
                 "stop" -> { stopService(Intent(this, KeepAliveService::class.java)); result.success(null) }
                 // returns true when the app is already exempt from battery optimisation; otherwise opens the system prompt and returns false
                 "batteryExempt" -> {
