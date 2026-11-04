@@ -5,13 +5,14 @@ enum TerminalMouseButton {
 
   right(id: 2),
 
-  wheelUp(id: 64 + 4, isWheel: true),
+  // remote-wake patch: the protocol codes are 64 (up), 65 (down), 66 (left), 67 (right). The original 64 + 4.. set the Shift bit, so tmux and other apps ignored every wheel event.
+  wheelUp(id: 64, isWheel: true),
 
-  wheelDown(id: 64 + 5, isWheel: true),
+  wheelDown(id: 65, isWheel: true),
 
-  wheelLeft(id: 64 + 6, isWheel: true),
+  wheelLeft(id: 66, isWheel: true),
 
-  wheelRight(id: 64 + 7, isWheel: true),
+  wheelRight(id: 67, isWheel: true),
   ;
 
   /// The id that is used to report a button press or release to the terminal.
