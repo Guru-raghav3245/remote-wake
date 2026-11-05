@@ -20,7 +20,7 @@
 @media(min-width:860px){:root{--rw:200px}}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;background:var(--bg)}
-body{margin:0;background:var(--bg);color:var(--text);font:400 15px/1.65 var(--mono);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body{position:relative;margin:0;background:var(--bg);color:var(--text);font:400 15px/1.65 var(--mono);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit}
 h1,h2,h3{margin:0;line-height:1.2;font-weight:700}
 h1{font-size:clamp(28px,5.2vw,46px);letter-spacing:-.02em}
@@ -98,6 +98,30 @@ section{padding:var(--s7) 0}
 .term{background:var(--stage);border:1px solid var(--line);border-radius:10px;padding:var(--s3);font-size:12px;line-height:1.6}
 .keys{display:flex;gap:var(--s2);flex-wrap:wrap}
 .keys span{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:var(--s1) var(--s3);font-size:12px;font-weight:600}
+
+/* the Mac app peeking in from the right edge of the screen: drawn at its real size (884 px wide), scaled down, about 70% visible */
+.peek{display:none;position:absolute;top:140px;left:calc(100vw - 470px);width:884px;transform:scale(.72);transform-origin:top left;z-index:0;pointer-events:none}
+.peek .mac{width:884px;max-width:none;border-radius:12px;box-shadow:0 30px 90px rgba(0,0,0,.65),0 0 60px rgba(123,224,176,.05)}
+.peek .bar{height:44px;padding:0 16px;gap:8px}
+.peek .bar i{width:13px;height:13px}
+.peek .bar b{margin-left:var(--s3);font-weight:600;font-size:13px;color:var(--muted)}
+.peek .body{padding:32px;gap:24px}
+.peek .two{display:grid;grid-template-columns:540px 280px;gap:24px;align-items:start}
+.peek .hero2{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:12px}
+.peek .stage{padding:0;border-radius:12px;height:124px;display:grid;place-items:center;overflow:hidden}
+.asc{margin:0;font:9.5px/7px var(--mono);color:var(--accent);white-space:pre;text-shadow:0 0 6px rgba(123,224,176,.35)}
+.peek .pathl{font-size:12px;white-space:pre;color:var(--muted)}
+.peek .act{display:flex;gap:16px;align-items:center}.peek .act .abtn{flex:none}
+.peek .act p{font-size:13px;color:var(--muted)}
+.peek .rd{background:var(--card);border:1px solid var(--line);border-radius:14px}
+.peek .rd div{padding:12px 16px}
+.peek .rd div+div{border-top:1px solid var(--line)}
+.peek .rd small{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}
+.peek .rd span{font-size:13px}
+.peek .lg{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 0;font-size:13px}
+.peek .lg div{display:grid;grid-template-columns:36px 84px 110px 1fr;padding:6px 16px;gap:4px}
+.peek .lg .n{color:var(--dim)}.peek .lg .t{color:var(--muted)}
+.peek .lg .you{background:rgba(255,106,193,.08);box-shadow:inset 2px 0 var(--pink)}
 
 /* download */
 .dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:var(--s4)}
@@ -219,6 +243,34 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
   </footer>
 </div>
 
+<div class="peek" aria-hidden="true">
+  <div class="mac">
+    <div class="bar"><i></i><i></i><i></i><b>Remote Wake</b></div>
+    <div class="body">
+      <div class="mhead"><img src="/logo.png" alt="" width="36" height="36">Remote Wake<span class="muted" style="margin-left:auto;font-size:13px;font-weight:400">Help</span></div>
+      <div class="two">
+        <div class="hero2">
+          <div class="stage"><pre class="asc" id="asc">AWAKE</pre></div>
+          <div class="pathl">[phone] ------------------o------------------ [mac awake]</div>
+          <div class="act"><a class="abtn quiet" data-label="STAY AWAKE: ON" tabindex="-1">[ STAY AWAKE: ON ]</a><p>Your Mac stays awake with the lid closed while it is plugged in.</p></div>
+        </div>
+        <div class="rd">
+          <div><small>power</small><span><span class="dot"></span>AC plugged in</span></div>
+          <div><small>tailscale</small><span><span class="dot"></span>running 100.x.x.x</span></div>
+          <div><small>phone</small><span><span class="dot"></span>online my-phone</span></div>
+          <div><small>phone sessions</small><span><span class="dot"></span>ready always on</span></div>
+        </div>
+      </div>
+      <div class="lg">
+        <div><span class="n">1</span><span class="t">21:53:38</span><span style="color:var(--accent)">app</span><span>Remote Wake started</span></div>
+        <div><span class="n">2</span><span class="t">21:53:38</span><span style="color:var(--accent)">tailscale</span><span>running &middot; 100.x.x.x</span></div>
+        <div><span class="n">3</span><span class="t">21:53:40</span><span style="color:var(--accent)">phone</span><span>my-phone online</span></div>
+        <div class="you"><span class="n">4</span><span class="t">21:54:02</span><span style="color:var(--pink)">you</span><span>stay awake on</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ---------- ASCII buttons: frame from data-label, ripple on the main action ---------- */
 (function(){
@@ -232,6 +284,30 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
   function line(n,t,k){var s="+";for(var i=1;i<n-1;i++){s+=k?RAMP[Math.floor((Math.sin(i*.55-t*.3+k)+1)/2*9)]:"-"}return s+"+"}
   function draw(a,t){var act=a.hasAttribute("data-act")&&!calm;a.querySelector(".t").textContent=line(a._n,t,act?1:0);a.querySelector(".b").textContent=line(a._n,t,act?2.4:0)}
   if(!calm){var t=0;setInterval(function(){t++;btns.forEach(function(a){if(a.hasAttribute("data-act"))draw(a,t)})},110)}
+})();
+
+/* ---------- the status word in the Mac mock: rasterised into a character grid, as in the app ---------- */
+(function(){
+  var el=document.getElementById("asc");if(!el)return;
+  var word="AWAKE",C=88,R=12,RAMP=" .:-=+*#%@",cv=document.createElement("canvas");cv.width=C;cv.height=R;
+  var x=cv.getContext("2d");x.fillStyle="#fff";x.font="900 "+R*1.02+"px ui-sans-serif,Helvetica,Arial,sans-serif";x.textBaseline="alphabetic";
+  var xs=1.23,gap=2,ws=[].map.call(word,function(c){return x.measureText(c).width*xs}),tot=ws.reduce(function(a,b){return a+b},0)+gap*(word.length-1),px=(C-tot)/2;
+  x.setTransform(xs,0,0,1,0,0);
+  for(var i=0;i<word.length;i++){x.fillText(word[i],px/xs,R*.86);px+=ws[i]+gap}
+  var d=x.getImageData(0,0,C,R).data,out="";
+  for(var r=0;r<R;r++){for(var c=0;c<C;c++){var a=d[(r*C+c)*4+3]/255;out+=a<.12?" ":RAMP[Math.min(9,Math.floor(3+a*5.99))]}out+="\n"}
+  el.textContent=out;
+})();
+
+/* ---------- the Mac window at the right edge: sized to the room beside the headline, about 75% visible ---------- */
+(function(){
+  var p=document.querySelector(".peek"),h=document.querySelector(".hero h1");if(!p||!h)return;
+  function fit(){
+    var W=document.documentElement.clientWidth,left=h.getBoundingClientRect().right+scrollX+28,s=(W-left)/(884*.75);
+    if(s<.42){p.style.display="none";return}
+    s=Math.min(s,.9);p.style.left=Math.round(W-884*s*.65)+"px";p.style.transform="scale("+s.toFixed(3)+")";p.style.display="block";
+  }
+  fit();addEventListener("resize",fit);
 })();
 
 /* ---------- path line: the dot travels while the phone reaches an awake Mac ---------- */
@@ -258,20 +334,34 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
     var ux=px[ia]-px[ib],uy=py[ia]-py[ib],uz=pz[ia]-pz[ib],vx=px[ja]-px[jb],vy=py[ja]-py[jb],vz=pz[ja]-pz[jb];
     var cx=uy*vz-uz*vy,cy=uz*vx-ux*vz,cz=ux*vy-uy*vx,l=Math.hypot(cx,cy,cz)||1;nx[a]=cx/l;ny[a]=cy/l;nz[a]=cz/l;
   }
-  // stem: a thin vertical tube under the bloom
-  var SN=60,sp=SN*8,sx=new Float32Array(sp),sy=new Float32Array(sp),sz=new Float32Array(sp);
-  for(i=0;i<SN;i++)for(j=0;j<8;j++){var a2=j/8*2*PI;sx[i*8+j]=.045*Math.cos(a2);sy[i*8+j]=.045*Math.sin(a2);sz[i*8+j]=-.05-i/SN*1.9}
+  // stem: a long wavy tube from the bloom down to the bottom of the screen, with leaves along it that turn with it
+  var sx,sy,sz,snx,sny,snz,sp=0;
+  function buildStem(len){
+    var X=[],Y=[],Z=[],NX=[],NY=[],NZ=[],PI2=2*PI;
+    function at(z){var d=-z-.05;return[.32*Math.sin(d*1.1),.06*Math.sin(d*1.9),z]}   // centre line, z is height (negative below the bloom)
+    function add(p,n){X.push(p[0]);Y.push(p[1]);Z.push(p[2]);var l=Math.hypot(n[0],n[1],n[2])||1;NX.push(n[0]/l);NY.push(n[1]/l);NZ.push(n[2]/l)}
+    var rings=Math.ceil(len/.03);
+    for(var i=0;i<rings;i++)for(var j=0;j<8;j++){var a=j/8*PI2,c=at(-.05-i*.03);add([c[0]+.075*Math.cos(a),c[1]+.075*Math.sin(a),c[2]],[Math.cos(a),Math.sin(a),0])}
+    function leaf(zz,phi,L){ // s runs along the leaf, w across it; it rises, then droops, with a slight fold down the middle
+      var o=at(zz),cp=Math.cos(phi),sn=Math.sin(phi);
+      function P(s,w){var hw=.27*Math.pow(Math.sin(PI*Math.min(1,Math.max(0,s))),.7)*w;return[o[0]+cp*L*s-sn*hw,o[1]+sn*L*s+cp*hw,o[2]+.3*s-.5*s*s+.06*Math.abs(w)*Math.sin(PI*s)]}
+      for(var a=0;a<=26;a++)for(var b=-8;b<=8;b++){var s=a/26,w=b/8,e=.02,A=P(s+e,w),B=P(s-e,w),C=P(s,w+e),D=P(s,w-e);
+        var u=[A[0]-B[0],A[1]-B[1],A[2]-B[2]],v=[C[0]-D[0],C[1]-D[1],C[2]-D[2]];add(P(s,w),[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]])}
+    }
+    for(var n=0,z=-.6;z>-len+.5;n++,z-=1.5)leaf(z,n%2?PI+.45:.5,n%2?.75:.85);
+    sp=X.length;sx=Float32Array.from(X);sy=Float32Array.from(Y);sz=Float32Array.from(Z);snx=Float32Array.from(NX);sny=Float32Array.from(NY);snz=Float32Array.from(NZ);
+  }
 
-  var CW,CH,cols,rows,dpr,tilt=.5,spin=0,target=0,raf=0,buf,col;
+  var CW,CH,cols,rows,dpr,sc,v0,tilt=.5,spin=0,target=0,raf=0,buf,col;
   function size(){
     var w=cv.clientWidth,h=cv.clientHeight,small=w<120;dpr=Math.min(devicePixelRatio||1,2);
-    CW=small?4:5;CH=small?6:8;cols=Math.floor(w/CW);rows=Math.floor(Math.min(h*.8,w*1.9)/CH);
+    CW=small?4:5;CH=small?6:8;cols=Math.floor(w/CW);rows=Math.floor(h/CH);sc=cols/2.3;var pad=Math.round(h*.06/CH);v0=pad+Math.round(sc*CW/CH*1.15+1);buildStem((rows-Math.round(pad*1.5)-v0)/(sc*CW/CH*Math.cos(tilt)));   // pad: breathing room above the bloom and below the stem
     cv.width=w*dpr;cv.height=h*dpr;g.setTransform(dpr,0,0,dpr,0,0);g.font="600 "+CH+"px ui-monospace,Menlo,monospace";g.textBaseline="top";
     buf=new Float32Array(cols*rows);col=new Uint8Array(cols*rows);draw();
   }
   function draw(){
     if(!cols)return;var w=cv.clientWidth,h=cv.clientHeight,cs=Math.cos(spin),sn=Math.sin(spin),ct=Math.cos(tilt),st=Math.sin(tilt);
-    var sc=cols/2.3,u0=cols/2,v0=rows*.3,d,bright=new Float32Array(cols*rows);buf.fill(-9);col.fill(0);
+    var u0=cols/2,d,bright=new Float32Array(cols*rows);buf.fill(-9);col.fill(0);
     function put(x,y,z,Nx,Ny,Nz,kind,rad){
       var X=x*cs-y*sn,Y=x*sn+y*cs,NX2=Nx*cs-Ny*sn,NY2=Nx*sn+Ny*cs;      // spin about the stem
       var V=z*ct-Y*st,D=Y*ct+z*st,NV=Nz*ct-NY2*st,ND=NY2*ct+Nz*st;     // tilt towards the viewer
@@ -279,14 +369,14 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
       if(cx<0||cx>=cols||cy<0||cy>=rows)return;var k=cy*cols+cx;
       if(D<=buf[k])return;buf[k]=D;
       var lit=Math.abs(NX2*-.35+NV*.6+ND*.7);                           // light from the upper left, two-sided
-      var v=.1+.9*Math.pow(lit,1.2)*(.6+.4*Math.min(1,Math.max(0,(D+1.1)/2.2)));bright[k]=Math.pow(Math.min(1,Math.max(0,(v-.3)/.6)),1.3);col[k]=kind;
+      var v=.1+.9*Math.pow(lit,1.2)*(.6+.4*Math.min(1,Math.max(0,(D+1.1)/2.2)));bright[k]=kind===2?.35+.65*Math.pow(lit,.8):Math.pow(Math.min(1,Math.max(0,(v-.3)/.6)),1.3);col[k]=kind;
     }
     for(var k=0;k<np;k++)put(px[k],py[k],pz[k],nx[k],ny[k],nz[k],1,ra[k]);
-    for(k=0;k<sp;k++)put(sx[k],sy[k],sz[k],sx[k]/.045,sy[k]/.045,0,2,.6);
+    for(k=0;k<sp;k++)put(sx[k],sy[k],sz[k],snx[k],sny[k],snz[k],2,.6);
     g.clearRect(0,0,w,h);var oy=(h-rows*CH)/2,ox=(w-cols*CW)/2;
     for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
       k=r*cols+c;if(buf[k]<=-9)continue;var b=bright[k],ch=RAMP[Math.min(RAMP.length-1,Math.floor(b*RAMP.length))];if(ch===" ")continue;
-      g.fillStyle=col[k]===2?"rgba(123,224,176,"+(.35+b*.6)+")":"rgba("+Math.round(190+65*b)+","+Math.round(40+90*b*b)+","+Math.round(60+90*b*b)+","+(.45+b*.55)+")";
+      g.fillStyle=col[k]===2?"rgba(123,224,176,"+(.55+Math.min(1,b+.35)*.45)+")":"rgba("+Math.round(190+65*b)+","+Math.round(40+90*b*b)+","+Math.round(60+90*b*b)+","+(.45+b*.55)+")";
       g.fillText(ch,ox+c*CW,oy+r*CH);
     }
   }
