@@ -1,6 +1,23 @@
-# Remote Wake: Test 1 (APNs wake probe)
+# Remote Wake (project notes for Claude Code)
 
-Spec: `Test 1 Can APNs wake a sleeping Mac.md`. IDs: team `65Q59PGHMZ`, key `L72JVD5GGR`, app `com.guru.wakeprobe`, extension `com.guru.wakeprobe.service`, group `group.com.guru.wakeprobe`.
+## Repository layout (reorganised 5 Nov 2026)
+```
+app/            Mac app (SwiftUI, one binary: window + menu-bar helper), build scripts, vendored Tailscale/tmux builds
+android-app/    Android app (Flutter + Go engine via FFI); third_party/xterm is a patched copy
+android-proto/  Go Tailscale engine (tsnet + SSH) used by android-app/build-engine.sh
+agent/          Root LaunchDaemon + install/uninstall scripts for stay-awake and Tailscale
+site/           Public website (single static page, deployed with the Vercel CLI)
+design/         Design tokens (tokens.md), logo/icon generator, demo pages
+docs/           Current product spec (v3); archive/ holds the old v2 specs
+research/       Finished experiments, kept for reference:
+  apns-probe/   Test 1 (APNs wake): Wake Probe app + extension, project.yml, send.sh, local-only key/build
+  wake-probes/  Tests 2 to 5 probe scripts (client/server/poll, trial*.sh, collect*.sh, logs)
+  results/      Test write-ups (Test 1, 2, 4, 5) and RESULTS.md
+```
+Scripts in `research/*` use paths relative to their own folder, so keep each folder together. Older notes below that name `project.yml`, `send.sh`, `server.py`, `client.py`, `wakeloop.py`, `trial*.sh`, `RESULTS.md`, the Test files or the specs mean the files in these folders.
+
+
+Spec: `research/results/Test 1 Can APNs wake a sleeping Mac.md`. IDs: team `65Q59PGHMZ`, key `L72JVD5GGR`, app `com.guru.wakeprobe`, extension `com.guru.wakeprobe.service`, group `group.com.guru.wakeprobe`.
 
 ## REMINDER: switch Xcode back to the personal Apple account
 Xcode is currently signed in with the Apple account of the user's employer. When Test 1 is finished (results written up, or the user moves on to Test 2), tell the user to:
@@ -10,8 +27,8 @@ Xcode is currently signed in with the Apple account of the user's employer. When
 Remind them at the start of any session that touches this project until it's done, and again whenever they say Test 1 is finished.
 
 ## Rules
-- Never commit, upload or print `AuthKey_L72JVD5GGR.p8`. It stays on the Mac and the sender VM only (`chmod 600`).
-- `.xcodeproj` is generated: edit `project.yml`, then run `xcodegen generate`.
+- Never commit, upload or print `AuthKey_L72JVD5GGR.p8` (now in `research/apns-probe/`). It stays on the Mac and the sender VM only (`chmod 600`).
+- `.xcodeproj` is generated: edit `research/apns-probe/project.yml`, then run `xcodegen generate` in that folder.
 
 ## Sender VM (Test 1 to 3 probe) — GCP project DELETED (2 Nov 2026)
 The user deleted GCP project `<gcp-project>` (VM and firewall rules included). It shows `DELETE_REQUESTED` and Google removes it for good after 30 days (about 2 Dec 2026); `gcloud projects undelete <gcp-project>` restores it until then. Nothing else to do. The `.p8` key is still on this Mac (revoke it in the Apple portal).
@@ -197,7 +214,7 @@ Question: can a phone app embed the Tailscale engine (no VpnService, no root) an
 - User's cleanup list: revoke the `wakeprobe apns` key and delete the test App IDs/App Group in the Apple portal, switch Xcode back to the personal account, delete stale Tailscale nodes, back up `~/.remote-wake-android.jks`, `.p8` deletion only when the user says so. Decisions open: SSH rule check vs accept, purge of old GitHub commits, paid signing (Developer ID $99, Play Store $25).
 
 ### Spec rewritten (2 Nov 2026)
-`Remote Wake for Mac Product Spec v3.md` describes the current design (stay awake on AC, bundled Tailscale + SSH, Android app, what is validated, risks, costs, open decisions, cleanup). The old `... Spec v2.md` (wake loop + cloud) is kept untouched for history; `... v2.0 (backup).md` too. The tailnet's SSH policy lists `root` as an allowed user (seen in `tailscale debug netmap`): the app only offers the user typed in, but tighten the rule if that matters.
+`docs/Remote Wake for Mac Product Spec v3.md` describes the current design (stay awake on AC, bundled Tailscale + SSH, Android app, what is validated, risks, costs, open decisions, cleanup). The old `docs/archive/... Spec v2.md` (wake loop + cloud) is kept untouched for history; `... v2.0 (backup).md` too. The tailnet's SSH policy lists `root` as an allowed user (seen in `tailscale debug netmap`): the app only offers the user typed in, but tighten the rule if that matters.
 
 ## Old cloud design — REMOVED (2 Nov 2026, user said "remove everything")
 Deleted: the Vercel project `remote-wake` (other Vercel projects `patchcord`, `panel-digest` belong to the user and were left alone), the Upstash Redis `upstash-kv-coffee-engine`, the repo's `cloud/` (Vercel service, Worker, Python server, PWA), `agent/wakeagent.py`, `agent/install.sh`, `agent/uninstall.sh`, `tests/test_protocol.py`, the root agent on the Mac (`com.guru.wakeagent` plist, `/usr/local/libexec/wakeagent.py`, `/etc/sudoers.d/remotewake`, its log) and the local tokens `~/.remote-wake-admin-token`, `~/.remote-wake-device.json`. Git history still has all of it (last commit with it: `d5eb0f2`). NOT touched: `~/.remote-wake-android.jks` (Android signing key, keep), the stay-awake daemon and its sudoers rule, the GCP project (blocked, see "Sender VM"). Still the user's to do in the Apple developer portal: revoke the `wakeprobe apns` key and remove the test App IDs / App Group.
