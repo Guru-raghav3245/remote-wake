@@ -160,6 +160,14 @@ Question: can a phone app embed the Tailscale engine (no VpnService, no root) an
 - Seen on screen: Mac main window (hero, path line, button, readout rows), menu bar icon rendered on dark/light bars, Android home/guide/terminal on the emulator (release APK, signed-out state). NOT seen: Mac off state and setup checklist, Mac menu bar panel in the real bar, Android with a live connection (ONLINE/ASLEEP, computers list, host-key dialog, banners with real events, Gboard typing), the new launcher/notification icons on the phone. The new APK is NOT installed on the user's phone yet.
 - Installing the new ad-hoc-signed Mac build changes its code hash, so macOS may drop Full Disk Access for "Remote Wake Menu": the app's setup step shows it again if so. The website (`site/`) still has the old Sage look and v0.1.0/0.2.0 text; update it together with the next release (new APK + DMG, new sha256 values).
 
+### Changes of 5 Nov 2026 (late) — built, installed on the user's Mac and phone; not released
+- ASLEEP/AWAKE word: grid 88x12 (was 94x9), cell height 7 (`AsciiWord.ch`), `xs` 1.23, S drawn at `.heavy` (rest `.black`): with fewer rows the E bars and S curves merged. The user rejected hand-made pixel fonts (too thin); keep the sampled heavy font.
+- Mac window is 884 pt wide, two columns (hero + cards left 540, readouts stacked right 280, log full width).
+- Phone sessions are ALWAYS ON (no toggle): `ensurePhone()` sets up the `.zshrc` block and tmux copy at launch and whenever missing (at most every 5 min), and re-applies `tmux.conf` when it changed. tmux status bar is off (`set -g status off`).
+- Full Disk Access: the helper only gets a grant after a restart, so the main app restarts the helper when it returns from System Settings after Allow access and at launch while the grant is unknown; the helper restarts the tmux server when the grant flips on.
+- Android: text typed in the command bar is sent (no Enter) before any key-row key, so `cd ` + Tab completes; the three shortcut rows can be hidden with the arrow above them (remembered, `Store.keysHidden`).
+- Site text about Phone sessions updated but NOT deployed (waits for the next release).
+
 ### Website + first release (3 Nov 2026) — LIVE
 - Site: static page in `site/` (Sage light/dark, Figtree, no build), deployed on Vercel as project `remote-wake`, live at https://remote-wake.vercel.app (deploy: `cd site && vercel deploy --prod --yes`; `.vercel` and `.env*` are gitignored). Downloads point at GitHub Releases `releases/latest/download/Remote-Wake.dmg` and `RemoteWake.apk`; the page shows their sha256, so UPDATE the two hashes in `site/index.html` (and the version text) for every new release.
 - Release v0.1.0 created by the user (the auto-mode classifier blocked `gh release create`, the user ran it with `!`): https://github.com/Guru-raghav3245/remote-wake/releases/tag/v0.1.0 . Files are copies of `app/Remote Wake.dmg` (as `Remote-Wake.dmg`) and `~/Downloads/RemoteWake.apk`.
