@@ -93,6 +93,8 @@ let permText = "Programs you run from your phone may need to read your files (De
 
 func tsPath() -> String? { ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tailscale"].first { FileManager.default.isExecutableFile(atPath: $0) } }
 
+struct LogLine: Identifiable { let id: Int; let t: Date; let tag: String; let msg: String; let color: Color }
+
 @MainActor final class Model: ObservableObject {
     @Published var running = false
     @Published var installed = false
@@ -107,13 +109,35 @@ func tsPath() -> String? { ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tails
     @Published var perms: [String: Bool] = [:]   // written by the helper
     @Published var busy = false
     @Published var error: String?
+    @Published var log: [LogLine] = []   // what happened, newest last: shown as the activity log
+    var logN = 0
     var timer: Timer?
     var tmuxStarting = false
 
-    init() {
-        refresh(); timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in Task { @MainActor in self.refresh() } } }
+    func note(_ tag: String, _ msg: String, _ color: Color = T.accent) {
+        logN += 1; log.append(LogLine(id: logN, t: Date(), tag: tag, msg: msg, color: color)); if log.count > 50 { log.removeFirst() }
+    }
 
+    init() {
+        readState()
+        note("app", "Remote Wake started"); note("tailscale", tsState == "Running" ? "running · \(tsIP)" : tsState, tsState == "Running" ? T.accent : T.warn)
+        note("daemon", running ? "stay awake on" : "stay awake off", running ? T.accent : T.danger)
+        timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in Task { @MainActor in self.refresh() } } }
+
+    // Reads the state, then logs whatever changed since last time (so the log follows real events, not guesses).
     func refresh() {
+        let o = (running, holding, onAC, tsState, phones.first, phoneOn, tmuxRunning)
+        readState()
+        if o.0 != running { running ? note("daemon", "stay awake on · caffeinate -s") : note("daemon", "stay awake off · Mac may sleep", T.danger) }
+        if running && o.1 != holding { holding ? note("power", "sleep blocked") : note("power", "waiting for AC · sleeps on battery", T.warn) }
+        if o.2 != onAC { note("power", onAC ? "AC connected" : "on battery", onAC ? T.accent : T.warn) }
+        if o.3 != tsState { note("tailscale", tsState == "Running" ? "running · \(tsIP)" : tsState, tsState == "Running" ? T.accent : T.warn) }
+        if o.4 != phones.first, let ph = phones.first { let on = !ph.hasSuffix("(offline)"); note("phone", ph.replacingOccurrences(of: " (offline)", with: "") + (on ? " online" : " offline"), on ? T.accent : T.warn) }
+        if o.5 != phoneOn { note("session", phoneOn ? "phone sessions on" : "phone sessions off", phoneOn ? T.accent : T.warn) }
+        if phoneOn && o.6 != tmuxRunning { note("session", tmuxRunning ? "phone session ready" : "phone session starting…", tmuxRunning ? T.accent : T.warn) }
+    }
+
+    func readState() {
         installed = FileManager.default.fileExists(atPath: plist)
         running = run("/bin/launchctl", ["print", "system/\(label)"]).status == 0
         onAC = run("/usr/bin/pmset", ["-g", "batt"]).out.contains("AC Power")
@@ -136,24 +160,25 @@ func tsPath() -> String? { ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tails
         let on = !running
         let cmds = on ? [["enable", "system/\(label)"], ["bootstrap", "system", plist]]
                       : [["disable", "system/\(label)"], ["bootout", "system/\(label)"]]
-        busy = true
+        busy = true; note("you", on ? "turning stay awake on…" : "turning stay awake off…", T.pink)
         Task.detached {
             func go() -> Bool { cmds.allSatisfy { run("/usr/bin/sudo", ["-n", "/bin/launchctl"] + $0).status == 0 } }
             var ok = go()
             // no rule yet (daemon installed by hand): one admin prompt creates it, then retry
             if !ok && !FileManager.default.fileExists(atPath: sudoersPath) && rootInstall() { ok = go() }
             let done = ok
-            await MainActor.run { self.busy = false; self.error = done ? nil : "Toggle cancelled or failed"; self.refresh() }
+            await MainActor.run { self.busy = false; self.error = done ? nil : "Toggle cancelled or failed"; if !done { self.note("daemon", "toggle cancelled or failed", T.danger) }; self.refresh() }
         }
     }
 
     func phoneSessions(_ on: Bool) {
-        busy = true
+        busy = true; note("you", on ? "turning phone sessions on…" : "turning phone sessions off…", T.pink)
         Task.detached { setPhone(on); await MainActor.run { self.busy = false; self.refresh() } }
     }
 
     func connect() {
         guard let ts = tsPath() else { return }
+        note("you", "connecting Tailscale…", T.pink)
         let host = (Host.current().localizedName ?? "mac").lowercased().replacingOccurrences(of: "['\u{2019}]", with: "", options: .regularExpression).replacingOccurrences(of: "[^a-z0-9]+", with: "-", options: .regularExpression)
         let p = Process(); p.executableURL = URL(fileURLWithPath: ts)
         p.arguments = ["up", "--ssh", "--hostname=\(host)"]   // blocks until sign-in; ends by itself
@@ -162,10 +187,10 @@ func tsPath() -> String? { ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tails
     }
 
     func install() {
-        busy = true
+        busy = true; note("you", "installing Tailscale and the stay-awake service…", T.pink)
         Task.detached {
             let ok = rootInstall()
-            await MainActor.run { self.busy = false; self.error = ok ? nil : "Install cancelled or failed"; self.refresh() }
+            await MainActor.run { self.busy = false; self.error = ok ? nil : "Install cancelled or failed"; self.note("install", ok ? "done" : "cancelled or failed", ok ? T.accent : T.danger); self.refresh() }
         }
     }
 }
@@ -248,9 +273,9 @@ func value(_ s: String) -> some View { Text(s).font(ff(13)).foregroundStyle(T.te
 // ASCII word: the text is rasterised into a character grid, then each filled cell is drawn as a character whose density follows a light sweeping across.
 struct WordGrid { let cols: Int, rows: Int, a: [UInt8] }
 func makeWord(_ word: String, cols: Int, rows: Int) -> WordGrid {
-    let chars = Array(word), gap: CGFloat = 2
+    let chars = Array(word), gap: CGFloat = 2, xs: CGFloat = 1.84   // cells are 10.5 tall by 5.7 wide: draw letters wider so they look natural on screen
     func font(_ s: CGFloat) -> NSFont { NSFont.systemFont(ofSize: s, weight: .black) }
-    func widths(_ s: CGFloat) -> [CGFloat] { chars.map { NSAttributedString(string: String($0), attributes: [.font: font(s)]).size().width } }
+    func widths(_ s: CGFloat) -> [CGFloat] { chars.map { NSAttributedString(string: String($0), attributes: [.font: font(s)]).size().width * xs } }
     var fs = CGFloat(rows) * 1.25, ws = widths(fs)
     func total() -> CGFloat { ws.reduce(0, +) + gap * CGFloat(chars.count - 1) }
     while total() > CGFloat(cols) * 0.92 { fs -= 2; ws = widths(fs) }
@@ -262,7 +287,9 @@ func makeWord(_ word: String, cols: Int, rows: Int) -> WordGrid {
         let f = font(fs), y = (CGFloat(rows) - f.capHeight) / 2 + f.descender
         var x = (CGFloat(cols) - total()) / 2
         for (i, c) in chars.enumerated() {
-            NSAttributedString(string: String(c), attributes: [.font: f, .foregroundColor: NSColor.white]).draw(at: NSPoint(x: x, y: y))
+            ctx.saveGState(); ctx.translateBy(x: x, y: 0); ctx.scaleBy(x: xs, y: 1)
+            NSAttributedString(string: String(c), attributes: [.font: f, .foregroundColor: NSColor.white]).draw(at: NSPoint(x: 0, y: y))
+            ctx.restoreGState()
             spans.append((c, x, ws[i])); x += ws[i] + gap
         }
         NSGraphicsContext.restoreGraphicsState()
@@ -275,7 +302,7 @@ func makeWord(_ word: String, cols: Int, rows: Int) -> WordGrid {
     return WordGrid(cols: cols, rows: rows, a: data)
 }
 @MainActor var wordCache: [String: WordGrid] = [:]
-@MainActor func word(_ w: String) -> WordGrid { if let g = wordCache[w] { return g }; let g = makeWord(w, cols: 62, rows: 10); wordCache[w] = g; return g }
+@MainActor func word(_ w: String) -> WordGrid { if let g = wordCache[w] { return g }; let g = makeWord(w, cols: 94, rows: 9); wordCache[w] = g; return g }
 
 struct AsciiWord: View {
     let grid: WordGrid, color: Color
@@ -309,7 +336,7 @@ struct AsciiWord: View {
                 } }
             }
         }
-          .frame(height: 140).frame(maxWidth: .infinity).background(T.stage, in: RoundedRectangle(cornerRadius: 10))
+          .frame(height: 124).frame(maxWidth: .infinity).background(T.stage, in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(T.line, lineWidth: 1))
         .accessibilityLabel("Status")
     }
@@ -343,6 +370,7 @@ extension Model {
     var permsOK: Bool { !needsPerms || (!perms.isEmpty && !perms.values.contains(false)) }
     var permsMissing: String { permNames.filter { perms[$0.key] != true }.map { $0.value }.sorted().joined(separator: ", ") }
     func grantAccess() {
+        note("you", "opened Full Disk Access settings", T.pink)
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
     }
     var ready: Bool { installed && tsState != "not installed" }
@@ -430,14 +458,81 @@ struct Hero: View {
         VStack(alignment: .leading, spacing: S.md) {
             AsciiWord(grid: word(info.0), color: info.1)
             PathLine(live: m.running && m.holding && phoneOnline, phoneOnline: phoneOnline, macWord: m.running && m.holding ? "awake" : "asleep")
-            Text(m.heroText).font(ff(13)).foregroundStyle(T.muted).fixedSize(horizontal: false, vertical: true)
-            if !m.running {
-                Text("! Action needed: your phone cannot reach this Mac while it sleeps.").font(ff(12, .semibold)).foregroundStyle(T.danger).fixedSize(horizontal: false, vertical: true)
-                AsciiButton("KEEP MY MAC AWAKE") { m.toggle() }.disabled(m.busy)
-            } else {
-                AsciiButton("STOP STAYING AWAKE", primary: false) { m.toggle() }.disabled(m.busy)
+            HStack(alignment: .center, spacing: S.lg) {
+                if !m.running { AsciiButton("KEEP MY MAC AWAKE") { m.toggle() }.disabled(m.busy) }
+                else { AsciiButton("STOP STAYING AWAKE", primary: false) { m.toggle() }.disabled(m.busy) }
+                VStack(alignment: .leading, spacing: S.xs) {
+                    if !m.running { Text("! Action needed: your phone cannot reach this Mac while it sleeps.").font(ff(12, .semibold)).foregroundStyle(T.danger) }
+                    Text(m.heroText).font(ff(12)).foregroundStyle(T.muted)
+                }.fixedSize(horizontal: false, vertical: true)
             }
         }.card()
+    }
+}
+
+// Four readouts side by side (as in the demo): power, tailscale, phone, phone sessions.
+struct Cell<C: View>: View {
+    let label: String
+    @ViewBuilder var content: C
+    var body: some View { VStack(alignment: .leading, spacing: S.sm) { Text(label).font(ff(11)).foregroundStyle(T.muted); content }.padding(S.md).frame(maxWidth: .infinity, alignment: .leading) }
+}
+func small(_ s: String) -> some View { Text(s).font(ff(12)).foregroundStyle(T.text).lineLimit(1).truncationMode(.tail) }
+struct Readouts: View {
+    @ObservedObject var m: Model
+    var hasTmux: Bool { FileManager.default.fileExists(atPath: resRoot + "/tmux/tmux") }
+    var body: some View {
+        let ph = m.phones.first, phOn = ph != nil && !(ph!.hasSuffix("(offline)"))
+        HStack(alignment: .top, spacing: 0) {   // fixedSize below: the dividers must not stretch the row
+            Cell(label: "power") { Status(word: m.onAC ? "AC" : "battery", color: m.onAC ? T.accent : T.warn); small(m.onAC ? "plugged in" : "sleeps normally") }
+            Rectangle().fill(T.line).frame(width: 1)
+            Cell(label: "tailscale") {
+                if m.tsState == "Running" { Status(word: "running", color: T.accent); small(m.tsIP) }
+                else if m.tsState == "NeedsLogin", let u = m.authURL, let url = URL(string: u) { Button("Sign in →") { NSWorkspace.shared.open(url) }.buttonStyle(Quiet()) }
+                else { Button("Connect →") { m.connect() }.buttonStyle(Quiet()) }
+            }
+            Rectangle().fill(T.line).frame(width: 1)
+            Cell(label: "phone") {
+                Status(word: ph == nil ? "none" : (phOn ? "online" : "offline"), color: ph == nil ? T.muted : (phOn ? T.accent : T.danger))
+                small(ph?.replacingOccurrences(of: " (offline)", with: "") ?? "not set up")
+            }
+            if hasTmux {
+                Rectangle().fill(T.line).frame(width: 1)
+                Cell(label: "phone sessions") {
+                    Toggle("Phone sessions", isOn: Binding(get: { m.phoneOn }, set: { m.phoneSessions($0) })).labelsHidden().toggleStyle(.switch).tint(T.accent).disabled(m.busy)
+                    if m.phoneOn { Status(word: m.tmuxRunning ? "ready" : "starting", color: m.tmuxRunning ? T.accent : T.warn) } else { small("off") }
+                }
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .background(T.card, in: RoundedRectangle(cornerRadius: 14)).overlay(RoundedRectangle(cornerRadius: 14).stroke(T.line, lineWidth: 1))
+    }
+}
+
+// Activity log: the last six real events (state changes and the user's own actions), newest highlighted like the current line in an editor.
+let logTime: DateFormatter = { let f = DateFormatter(); f.dateFormat = "HH:mm:ss"; return f }()
+struct LogView: View {
+    @ObservedObject var m: Model
+    var body: some View {
+        let rows = Array(m.log.suffix(6))
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(rows) { l in
+                let cur = l.id == rows.last?.id
+                HStack(spacing: S.sm) {
+                    Text(String(format: "%3d", l.id)).foregroundStyle(T.dim)
+                    Text(logTime.string(from: l.t)).foregroundStyle(T.dim)
+                    Text(l.tag).foregroundStyle(l.color).frame(width: 64, alignment: .leading)
+                    Text(l.msg).foregroundStyle(T.text).lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .font(ff(11.5)).padding(.horizontal, S.md).frame(height: 22)
+                .background(cur ? T.pink.opacity(0.10) : Color.clear)
+                .overlay(alignment: .leading) { if cur { Rectangle().fill(T.pink).frame(width: 2) } }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, S.sm).frame(height: 6 * 22 + 2 * S.sm, alignment: .top).frame(maxWidth: .infinity, alignment: .leading)
+        .background(T.card, in: RoundedRectangle(cornerRadius: 14)).overlay(RoundedRectangle(cornerRadius: 14).stroke(T.line, lineWidth: 1))
+        .accessibilityLabel("Activity log")
     }
 }
 
@@ -471,33 +566,12 @@ struct PermsCard: View {
     }
 }
 
-struct PhoneSessionsCard: View {
-    @ObservedObject var m: Model
-    var body: some View {
-        if FileManager.default.fileExists(atPath: resRoot + "/tmux/tmux") {
-            VStack(alignment: .leading, spacing: S.md) {
-                HStack(alignment: .center, spacing: S.lg) {
-                    VStack(alignment: .leading, spacing: S.xs) {
-                        Text("Phone sessions").font(ff(17, .semibold)).foregroundStyle(T.text)
-                        Text("Phone terminals share a session with your desktop login, so Claude Code, git and other tools stay signed in, and programs keep running if the phone drops.")
-                            .font(ff(14)).foregroundStyle(T.muted).fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: S.md)
-                    Toggle("Phone sessions", isOn: Binding(get: { m.phoneOn }, set: { m.phoneSessions($0) })).labelsHidden().toggleStyle(.switch).tint(T.accent).disabled(m.busy)
-                }
-                if m.phoneOn { Status(word: m.tmuxRunning ? "Ready" : "Starting", color: m.tmuxRunning ? T.accent : T.warn) }
-                Text("Adds a short block to ~/.zshrc (turning this off removes it). Needs this Mac to be logged in; a locked screen is fine.")
-                    .font(ff(12)).foregroundStyle(T.muted).fixedSize(horizontal: false, vertical: true)
-            }.card()
-        }
-    }
-}
-
 struct HelpSheet: View {
     var close: () -> Void
     let tips = [("clock.arrow.circlepath", "About every 12 hours Tailscale asks your phone to approve a connection in the browser. The phone app shows an Approve button."),
                 ("arrow.triangle.2.circlepath", "If the connection drops, the phone reconnects. With Phone sessions on, your programs keep running and you land back in the same session."),
                 ("lock.shield", "After a power cut with FileVault on, this Mac waits for its password at startup and cannot be reached until someone unlocks it."),
+                ("terminal", "Phone sessions: phone terminals share a session with your desktop login, so Claude Code, git and other tools stay signed in, and programs keep running if the phone drops. Turning it on adds a short block to ~/.zshrc; turning it off removes it. Needs this Mac to be logged in (a locked screen is fine)."),
                 ("menubar.rectangle", "The Remote Wake icon in the menu bar stays when you close this window or quit the app.")]
     var body: some View {
         VStack(alignment: .leading, spacing: S.lg) {
@@ -532,20 +606,14 @@ struct MainView: View {
                 SetupView(m: m) { setupDone = true }
             } else {
                 Hero(m: m)
-                VStack(alignment: .leading, spacing: S.md) {
-                    InfoRow(label: "power") { Status(word: m.onAC ? "AC" : "battery", color: m.onAC ? T.accent : T.warn); value(m.onAC ? "plugged in" : "sleeps normally") }
-                    Divider().overlay(T.line)
-                    TailscaleRow(m: m)
-                    Divider().overlay(T.line)
-                    InfoRow(label: "phone") { phoneStatus(m) }
-                }.card()
+                Readouts(m: m)
                 PhoneCard(m: m)
-                PhoneSessionsCard(m: m)
                 PermsCard(m: m)
+                LogView(m: m)
             }
             if let e = m.error { Text(e).font(ff(13)).foregroundStyle(T.warn).padding(S.md).frame(maxWidth: .infinity, alignment: .leading).background(T.warnBg, in: RoundedRectangle(cornerRadius: 8)) }
         }
-        .padding(S.xl).frame(width: 440).background(T.bg)
+        .padding(S.xl).frame(width: 620).background(T.bg)
         .onChange(of: allDone) { if $0 { setupDone = true } }
         .onAppear { if allDone { setupDone = true } }
         .sheet(isPresented: $help) { HelpSheet { help = false } }

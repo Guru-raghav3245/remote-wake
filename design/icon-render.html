@@ -33,7 +33,8 @@ function art(g,S,L){
 // spec: px canvas size, L logical size (picks the detail tier), frac = share of the canvas the artwork covers (centred), mode: full (dark tile) | glyph (no tile) | white (single colour, no tile)
 function render(px,L,frac,mode){const cv=document.createElement('canvas');cv.width=cv.height=px;const g=cv.getContext('2d');
  const A=px*frac,o=(px-A)/2;g.translate(o,o);MINT=mode==='white'?'255,255,255':'123,224,176';
- if(mode==='full')bg(g,A);art(g,A,L);if(mode==='full')g.restore();return cv.toDataURL('image/png')}
+ if(mode==='full'){bg(g,A);const k=.74;g.translate(A/2,A/2);g.scale(k,k);g.translate(-A/2,-A/2)} // inside the tile, keep the artwork off the edges
+ art(g,A,L);if(mode==='full')g.restore();return cv.toDataURL('image/png')}
 const out={};
 for(const[n,px,L]of[['icon_16x16',16,16],['icon_16x16@2x',32,16],['icon_32x32',32,32],['icon_32x32@2x',64,32],['icon_128x128',128,128],['icon_128x128@2x',256,128],['icon_256x256',256,256],['icon_256x256@2x',512,256],['icon_512x512',512,512],['icon_512x512@2x',1024,512]])
  out['mac/'+n]=render(px,L,.8047,'full');
