@@ -1,0 +1,46 @@
+<!doctype html><meta charset="utf-8"><body><pre id="out"></pre><script>
+// Renders every app icon (Mac iconset, Android launcher layers, notification glyph) with the same drawing code as logo-options.html (option B).
+// Run by design/make-icons.py via headless Chrome; results come back as data URLs in #out.
+const RAMP=" .:-=+*#%@";let MINT='123,224,176';
+function sample(text,cols,rows,font){const o=document.createElement('canvas');o.width=cols;o.height=rows;const g=o.getContext('2d');
+ g.fillStyle='#fff';g.textAlign='center';g.textBaseline='middle';g.font=font;g.fillText(text,cols/2,rows/2);
+ const d=g.getImageData(0,0,cols,rows).data;return(r,c)=>d[(r*cols+c)*4+3]/255}
+function put(g,ch,x,y,fs,b,a=1){g.font=fs+'px ui-monospace,Menlo,monospace';g.fillStyle=`rgba(${MINT},${a})`;g.fillText(ch,x,y)}
+const shade=(c,r,cols,rows)=>Math.min(1,.45+.55*(1-(c/cols*.55+r/rows*.45)));
+function bg(g,S){g.save();g.beginPath();g.roundRect(0,0,S,S,S*.2237);g.clip();
+ g.fillStyle='#08080b';g.fillRect(0,0,S,S);let s=11;const rn=()=>(s=(s*16807)%2147483647)/2147483647;
+ for(let i=0;i<36;i++){g.fillStyle='rgba(255,255,255,.35)';g.fillRect(rn()*S,rn()*S,S/300+.6,S/300+.6)}}
+function zLetter(g,S,L,n,cs,x,y,alpha){const f=sample(L,n,n,`900 ${n*1.15}px Helvetica,Arial,sans-serif`);g.textBaseline='top';
+ for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(f(r,c)>.45)put(g,'z',x+c*cs,y+r*cs*1.15,cs*1.5,1,alpha*(.7+.3*(1-r/n)))}
+const BM=["##..........",".##.........","..##........","...##.......","..##........",".##.........","##..........","......######"];
+const prompt=k=>(r,c)=>BM[Math.floor(r/k)][Math.floor(c/k)]==='#'?1:0;
+function art(g,S,L){
+ if(L>=128){
+  const C=24,R=16,cw=S*.72/C,ch=cw*1.2,s=prompt(2);g.textBaseline='top';
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){if(!s(r,c))continue;const b=shade(c,r,C,R);put(g,RAMP[Math.floor(4+b*5)],S*.14+c*cw,S*.4+r*ch,cw*1.55,1,.4+b*.6)}
+  zLetter(g,S,'z',8,S*.021,S*.46,S*.2,.8);zLetter(g,S,'Z',11,S*.027,S*.6,S*.04,1)}
+ else if(L>=48){
+  const dots=(f,n,m,x,y,cs,a)=>{g.fillStyle=`rgba(${MINT},${a})`;for(let r=0;r<n;r++)for(let c=0;c<m;c++)if(f(r,c)>.45)g.fillRect(x+c*cs,y+r*cs,cs*.8,cs*.8)};
+  dots(prompt(1),8,12,S*.14,S*.46,S*.058,1);
+  dots(sample('z',5,5,'900 6px Helvetica,Arial,sans-serif'),5,5,S*.5,S*.27,S*.05,.8);
+  dots(sample('Z',7,7,'900 8px Helvetica,Arial,sans-serif'),7,7,S*.6,S*.07,S*.055,1)}
+ else{
+  g.strokeStyle=g.fillStyle=`rgb(${MINT})`;g.lineWidth=S*.1;g.lineCap='round';g.lineJoin='round';
+  g.beginPath();g.moveTo(S*.2,S*.5);g.lineTo(S*.4,S*.65);g.lineTo(S*.2,S*.8);g.stroke();
+  g.fillRect(S*.48,S*.77,S*.24,S*.08);
+  g.textBaseline='top';g.font=`900 ${S*.42}px Helvetica,Arial,sans-serif`;g.fillText('Z',S*.55,S*.06);
+  g.font=`900 ${S*.26}px Helvetica,Arial,sans-serif`;g.fillText('z',S*.38,S*.28)}}
+// spec: px canvas size, L logical size (picks the detail tier), frac = share of the canvas the artwork covers (centred), mode: full (dark tile) | glyph (no tile) | white (single colour, no tile)
+function render(px,L,frac,mode){const cv=document.createElement('canvas');cv.width=cv.height=px;const g=cv.getContext('2d');
+ const A=px*frac,o=(px-A)/2;g.translate(o,o);MINT=mode==='white'?'255,255,255':'123,224,176';
+ if(mode==='full')bg(g,A);art(g,A,L);if(mode==='full')g.restore();return cv.toDataURL('image/png')}
+const out={};
+for(const[n,px,L]of[['icon_16x16',16,16],['icon_16x16@2x',32,16],['icon_32x32',32,32],['icon_32x32@2x',64,32],['icon_128x128',128,128],['icon_128x128@2x',256,128],['icon_256x256',256,256],['icon_256x256@2x',512,256],['icon_512x512',512,512],['icon_512x512@2x',1024,512]])
+ out['mac/'+n]=render(px,L,.8047,'full');
+for(const[d,px]of[['mdpi',48],['hdpi',72],['xhdpi',96],['xxhdpi',144],['xxxhdpi',192]])out['android/legacy-'+d]=render(px,48,1,'full');
+out['android/fg']=render(432,66,.61,'glyph');
+out['android/mono']=render(432,24,.61,'white');
+for(const[d,px]of[['mdpi',24],['hdpi',36],['xhdpi',48],['xxhdpi',72]])out['android/stat-'+d]=render(px,24,1,'white');
+out['logo/512']=render(512,256,1,'full');out['logo/128']=render(128,64,1,'full');out['logo/1024']=render(1024,512,1,'full');
+document.getElementById('out').textContent=JSON.stringify(out);
+</script>

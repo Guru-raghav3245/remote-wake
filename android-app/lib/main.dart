@@ -9,16 +9,9 @@ import 'terminal_page.dart';
 import 'theme.dart';
 import 'tutorial.dart';
 
-final themeMode = ValueNotifier<ThemeMode>(ThemeMode.system);
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final saved = await Store.themeMode();
-  themeMode.value = ThemeMode.values.firstWhere((m) => m.name == saved, orElse: () => ThemeMode.system);
-  runApp(ValueListenableBuilder<ThemeMode>(
-    valueListenable: themeMode,
-    builder: (_, mode, _) => MaterialApp(title: 'Remote Wake', theme: sageTheme(Brightness.light), darkTheme: sageTheme(Brightness.dark), themeMode: mode, home: const Home()),
-  ));
+  runApp(MaterialApp(title: 'Remote Wake', theme: sageTheme(), darkTheme: sageTheme(), themeMode: ThemeMode.dark, home: const Home()));
 }
 
 class Home extends StatefulWidget {
@@ -62,9 +55,9 @@ class _HomeState extends State<Home> {
     final user = await showDialog<String>(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text('Connect to ${p['name']}'),
+        title: Text('Connect to ${p['name']}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Type the user name you log in with on that computer.', style: TextStyle(color: c.sage.muted)),
+          Text('Type the user name you log in with on that computer.', style: TextStyle(color: c.sage.muted, fontSize: 13, height: 1.4)),
           const SizedBox(height: Sp.lg),
           TextField(controller: ctl, autofocus: true, autocorrect: false, enableSuggestions: false, decoration: const InputDecoration(labelText: 'User name')),
         ]),
@@ -87,35 +80,52 @@ class _HomeState extends State<Home> {
     final running = st['state'] == 'Running';
     final needsLogin = url.isNotEmpty;
     final ip = (st['ips'] as List?)?.firstOrNull?.toString() ?? '';
-    final tt = Theme.of(c).textTheme;
     return AppCard(
-      tint: running,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         StatusWord(running ? 'Connected' : (needsLogin ? 'Sign-in needed' : 'Starting'), running ? s.accent : (needsLogin ? s.warn : s.muted)),
         const SizedBox(height: Sp.sm),
-        Text(running ? 'Tailscale is on' : (needsLogin ? 'Sign in to Tailscale' : 'Starting Tailscale'), style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+        Text(running ? 'Tailscale is on' : (needsLogin ? 'Sign in to Tailscale' : 'Starting Tailscale'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
         const SizedBox(height: Sp.xs),
-        Text(running ? ip : (needsLogin ? 'Use the same account as on your Mac.' : 'This takes a few seconds.'), style: TextStyle(color: s.muted, fontSize: 15)),
-        if (needsLogin && !running) ...[const SizedBox(height: Sp.lg), FilledButton(onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication), child: const Text('Sign in'))],
+        Text(running ? ip : (needsLogin ? 'Use the same account as on your Mac.' : 'This takes a few seconds.'), style: TextStyle(color: s.muted, fontSize: 13, height: 1.4)),
+        if (needsLogin && !running) ...[const SizedBox(height: Sp.md), AsciiButton('Sign in', onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication))],
       ]),
     );
+  }
+
+  // Hero: the ASCII laptop and one plain status word about the Mac.
+  Widget _hero(BuildContext c, List<Map> macs) {
+    final s = c.sage, running = st['state'] == 'Running', needsLogin = (st['authUrl'] as String? ?? '').isNotEmpty;
+    final online = macs.any((p) => p['online'] == true);
+    final (mode, word, col) = !running
+        ? (LaptopMode.idle, needsLogin ? 'SIGN IN' : 'CONNECTING', s.muted)
+        : macs.isEmpty ? (LaptopMode.idle, 'NO MAC', s.muted)
+        : online ? (LaptopMode.on, 'ONLINE', s.accent) : (LaptopMode.off, 'ASLEEP', s.danger);
+    return Column(children: [
+      AsciiLaptop(mode),
+      const SizedBox(height: Sp.md),
+      Text(word, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: 3, color: col)),
+      if (running && macs.isNotEmpty && !online) ...[
+        const SizedBox(height: Sp.sm),
+        Text('Your Mac is not reachable. Open Remote Wake on it and turn on stay awake.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, height: 1.4, color: s.danger)),
+      ],
+    ]);
   }
 
   Widget _computer(BuildContext c, Map p) {
     final s = c.sage, online = p['online'] == true;
     return Opacity(
-      opacity: online ? 1 : .55,
+      opacity: online ? 1 : .6,
       child: AppCard(
         onTap: online ? () => _open(p) : null,
         child: Row(children: [
-          Container(width: 44, height: 44, decoration: BoxDecoration(color: s.soft, borderRadius: BorderRadius.circular(12)), child: Icon(Icons.laptop_mac, color: s.accent)),
+          Container(width: 44, height: 44, decoration: BoxDecoration(color: s.bg, border: Border.all(color: s.line), borderRadius: BorderRadius.circular(12)), child: Icon(Icons.laptop_mac, color: online ? s.accent : s.muted)),
           const SizedBox(width: Sp.lg),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${p['name']}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+            Text('${p['name']}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             const SizedBox(height: Sp.xs),
             StatusWord(online ? 'Online' : 'Offline', online ? s.accent : s.muted),
           ])),
-          if (online) Icon(Icons.chevron_right, color: s.muted),
+          if (online) Text('>', style: TextStyle(color: s.accent, fontSize: 20, fontWeight: FontWeight.w700)),
         ]),
       ),
     );
@@ -129,22 +139,15 @@ class _HomeState extends State<Home> {
       ..sort((a, b) => ((b['online'] == true ? 2 : 0) + (b['os'] == 'macOS' ? 1 : 0)).compareTo((a['online'] == true ? 2 : 0) + (a['os'] == 'macOS' ? 1 : 0)));
     return Scaffold(
       appBar: AppBar(
-        title: const Row(children: [Logo(size: 32), SizedBox(width: Sp.md), Text('Remote Wake')]),
+        title: const Row(children: [Logo(size: 32), SizedBox(width: Sp.md), Text('remote-wake')]),
         actions: [
           IconButton(icon: const Icon(Icons.help_outline), tooltip: 'Guide', onPressed: _tutorial),
-          PopupMenuButton<ThemeMode>(
-            icon: const Icon(Icons.brightness_6_outlined), tooltip: 'Appearance',
-            onSelected: (m) { themeMode.value = m; Store.setThemeMode(m.name); },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: ThemeMode.system, child: Text('Match system')),
-              PopupMenuItem(value: ThemeMode.light, child: Text('Light')),
-              PopupMenuItem(value: ThemeMode.dark, child: Text('Dark')),
-            ],
-          ),
           const SizedBox(width: Sp.sm),
         ],
       ),
       body: ListView(padding: const EdgeInsets.all(Sp.lg), children: [
+        _hero(c, peers.where((p) => p['os'] == 'macOS').toList()),
+        const SizedBox(height: Sp.xl),
         _connection(c),
         if (running) ...[
           const SizedBox(height: Sp.xl),
@@ -152,13 +155,11 @@ class _HomeState extends State<Home> {
           const SizedBox(height: Sp.md),
           if (peers.isEmpty)
             AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Icon(Icons.laptop_mac, color: s.muted, size: 28),
-              const SizedBox(height: Sp.md),
-              const Text('No computers yet', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+              const Text('No computers yet', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               const SizedBox(height: Sp.xs),
-              Text('On your Mac, open Remote Wake and finish the three setup steps. It shows up here by itself.', style: TextStyle(color: s.muted, fontSize: 15, height: 1.4)),
-              const SizedBox(height: Sp.lg),
-              OutlinedButton(onPressed: _tutorial, child: const Text('Open the guide')),
+              Text('On your Mac, open Remote Wake and finish the three setup steps. It shows up here by itself.', style: TextStyle(color: s.muted, fontSize: 13, height: 1.4)),
+              const SizedBox(height: Sp.md),
+              AsciiButton('Open the guide', primary: false, onPressed: _tutorial),
             ]))
           else
             for (final p in peers) Padding(padding: const EdgeInsets.only(bottom: Sp.md), child: _computer(c, p)),

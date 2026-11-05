@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Remote Wake: logo options</title>
+<style>
+:root{--bg:#0b0b0e;--panel:#121217;--line:#23232b;--tx:#e8e8ec;--dim:#6b6b78;--ok:#7be0b0}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--tx);font:13px/1.6 ui-monospace,"SF Mono",Menlo,monospace;padding:24px 16px}
+.w{max-width:1000px;margin:0 auto}
+h1{font-size:12px;font-weight:600;color:var(--dim);letter-spacing:.08em;margin-bottom:16px}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.c{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;align-items:center}
+.c b{font-size:13px;align-self:flex-start}.c small{color:var(--dim);align-self:flex-start;min-height:3.2em}
+.sz{display:flex;gap:14px;align-items:flex-end}
+.mb{display:flex;gap:12px;padding:6px 12px;border-radius:6px;align-items:center;font-size:11px}
+.mb.d{background:#1c1c22;color:#ddd}.mb.l{background:#e9e9ee;color:#222}
+.note{color:var(--dim);font-size:11px;margin-top:16px}
+canvas{display:block}
+</style></head><body><div class="w">
+<h1>REMOTE WAKE / LOGO OPTIONS: TERMINAL-BLOOM LANGUAGE</h1>
+<div class="g" id="g"></div>
+<p class="note">Each logo is built from text characters shaded by density, mint on near-black, like the status word. Under each big version: 64, 32 and 16 px, then a menu-bar mock (plain solid shape, because characters can't survive at 16 px).</p>
+</div>
+<script>
+const RAMP=" .:-=+*#%@",MINT='123,224,176';
+const LAPTOP=(()=>{const W=28,pad=(t)=>{const n=W-t.length,l=n>>1;return' '.repeat(l)+t+' '.repeat(n-l)};
+ return[pad('.'+'-'.repeat(22)+'.'),...Array(5).fill(pad('|'+'#'.repeat(22)+'|')),pad("'"+'-'.repeat(22)+"'"),".-'"+'-'.repeat(22)+"'-.","'"+'-'.repeat(26)+"'"]})();
+function sample(text,cols,rows,font){const o=document.createElement('canvas');o.width=cols;o.height=rows;const g=o.getContext('2d');
+ g.fillStyle='#fff';g.textAlign='center';g.textBaseline='middle';g.font=font;g.fillText(text,cols/2,rows/2);
+ const d=g.getImageData(0,0,cols,rows).data;return(r,c)=>d[(r*cols+c)*4+3]/255}
+// cell painter
+function put(g,ch,x,y,fs,b,a=1){g.font=fs+'px ui-monospace,Menlo,monospace';g.fillStyle=`rgba(${MINT},${a})`;g.fillText(ch,x,y)}
+const shade=(c,r,cols,rows)=>Math.min(1,.45+.55*(1-(c/cols*.55+r/rows*.45)));
+function bg(g,S){g.clearRect(0,0,S,S);g.save();g.beginPath();g.roundRect(0,0,S,S,S*.2237);g.clip();
+ g.fillStyle='#08080b';g.fillRect(0,0,S,S);let s=11;const rn=()=>(s=(s*16807)%2147483647)/2147483647;
+ for(let i=0;i<36;i++){g.fillStyle='rgba(255,255,255,.35)';g.fillRect(rn()*S,rn()*S,S/300+.6,S/300+.6)}}
+// a letter made of small z characters: sample the letter into an n x n grid, draw a 'z' in every filled cell
+function zLetter(g,S,L,n,cs,x,y,alpha){const f=sample(L,n,n,`900 ${n*1.15}px Helvetica,Arial,sans-serif`);g.textBaseline='top';
+ for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(f(r,c)>.45)put(g,'z',x+c*cs,y+r*cs*1.15,cs*1.5,1,alpha*(.7+.3*(1-r/n)))}
+function zz(g,S,x,y){g.textBaseline='top';put(g,'Z',x,y,S*.1,1,1);put(g,'z',x+S*.075,y-S*.05,S*.07,1,.8)}
+// hand-made ">_" bitmap, so the chevron is exactly mirror-symmetric top to bottom (a font sample was not)
+const BM=["##..........",".##.........","..##........","...##.......","..##........",".##.........","##..........","......######"];
+const prompt=k=>(r,c)=>BM[Math.floor(r/k)][Math.floor(c/k)]==='#'?1:0;
+const KINDS={
+ laptop:{t:'A · ASCII laptop',d:'The same laptop as the phone app. Screen glows; "zz" above.',draw(g,S){
+  const cw=S*.74/28,ch=cw*1.75,ox=S*.13,oy=S*.32;g.textBaseline='top';
+  LAPTOP.forEach((row,r)=>[...row].forEach((c,i)=>{if(c===' ')return;let chr=c,a=.6;
+   if(c==='#'){const b=shade(i,r,28,9);chr=RAMP[Math.floor(3+b*6)];a=.4+b*.6}
+   put(g,chr,ox+i*cw,oy+r*ch,cw*1.55,1,a)}));zz(g,S,S*.62,S*.14)}},
+ prompt:{t:'B · Prompt ">_"',d:'Three tiers: shaded characters when big, dot-matrix at 48 to 127 px, bold solid shapes below 48 px.',draw(g,S,L=S/2){
+  if(L>=128){
+   const C=24,R=16,cw=S*.72/C,ch=cw*1.2,s=prompt(2);g.textBaseline='top';
+   for(let r=0;r<R;r++)for(let c=0;c<C;c++){if(!s(r,c))continue;const b=shade(c,r,C,R);
+    put(g,RAMP[Math.floor(4+b*5)],S*.14+c*cw,S*.4+r*ch,cw*1.55,1,.4+b*.6)}
+   zLetter(g,S,'z',8,S*.021,S*.46,S*.2,.8);zLetter(g,S,'Z',11,S*.027,S*.6,S*.04,1)}
+  else if(L>=48){ // dot-matrix: same shapes, filled squares instead of characters
+   const dots=(f,n,m,x,y,cs,a)=>{g.fillStyle=`rgba(${MINT},${a})`;for(let r=0;r<n;r++)for(let c=0;c<m;c++)if(f(r,c)>.45)g.fillRect(x+c*cs,y+r*cs,cs*.8,cs*.8)};
+   dots(prompt(1),8,12,S*.14,S*.46,S*.058,1);
+   dots(sample('z',5,5,'900 6px Helvetica,Arial,sans-serif'),5,5,S*.5,S*.27,S*.05,.8);
+   dots(sample('Z',7,7,'900 8px Helvetica,Arial,sans-serif'),7,7,S*.6,S*.07,S*.055,1)}
+  else{ // tiny: bold solid shapes, no texture
+   g.strokeStyle=g.fillStyle=`rgb(${MINT})`;g.lineWidth=S*.1;g.lineCap='round';g.lineJoin='round';
+   g.beginPath();g.moveTo(S*.2,S*.5);g.lineTo(S*.4,S*.65);g.lineTo(S*.2,S*.8);g.stroke();
+   g.fillRect(S*.48,S*.77,S*.24,S*.08);
+   g.textBaseline='top';g.font=`900 ${S*.42}px Helvetica,Arial,sans-serif`;g.fillText('Z',S*.55,S*.06);
+   g.font=`900 ${S*.26}px Helvetica,Arial,sans-serif`;g.fillText('z',S*.38,S*.28)}}},
+ moon:{t:'C · Shaded moon',d:'A lit sphere of characters. Matches the menu-bar moon already in the app.',draw(g,S){
+  const C=36,R=22,cw=S*.8/C,ch=cw*1.7,Rad=10;g.textBaseline='top';
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){const x=(c-C/2)*.56*1.0*1.0*1,y=r-R/2;const d2=x*x+y*y;if(d2>=Rad*Rad)continue;
+   const z=Math.sqrt(Rad*Rad-d2),b=Math.max(0,(-.35*x/Rad-.85*y/Rad+.65*z/Rad)/1.12);if(b<.08)continue;
+   put(g,RAMP[Math.min(9,Math.floor(b*10))],S*.1+c*cw,S*.2+r*ch*.78,cw*1.55,1,.35+b*.65)}zz(g,S,S*.66,S*.12)}},
+ crescent:{t:'D · Crescent + zz',d:'A crescent of characters: sleep, but still glowing. Reads well small.',draw(g,S){
+  const C=34,R=22,cw=S*.78/C,ch=cw*1.7;g.textBaseline='top';
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){const x=(c-C/2)*.56,y=r-R/2,in1=x*x+y*y<=100,in2=(x-3.6)**2+(y+1.4)**2<=82;
+   if(!in1||in2)continue;const b=shade(c,r,C,R);put(g,RAMP[Math.floor(3+b*6)],S*.11+c*cw,S*.2+r*ch*.78,cw*1.55,1,.4+b*.6)}
+  zz(g,S,S*.6,S*.52)}}};
+const grid=document.getElementById('g');
+for(const[k,v]of Object.entries(KINDS)){if(k!=='prompt')continue;
+ const c=document.createElement('div');c.className='c';
+ c.innerHTML=`<b>${v.t}</b><small>${v.d}</small>`;
+ const big=document.createElement('canvas');big.width=big.height=440;big.style.width=big.style.height='220px';c.append(big);
+ const g=big.getContext('2d');bg(g,440);v.draw(g,440);g.restore();
+ const sz=document.createElement('div');sz.className='sz';
+ for(const n of[64,32,16]){const s=document.createElement('canvas');s.width=s.height=n*2;s.style.width=s.style.height=n+'px';const x=s.getContext('2d');bg(x,n*2);v.draw(x,n*2,n);x.restore();sz.append(s)}
+ c.append(sz);
+ const mb=['d','l'].map(m=>{const e=document.createElement('div');e.className='mb '+m;const s=document.createElement('canvas');s.width=s.height=36;s.style.width=s.style.height='18px';
+  const x=s.getContext('2d');x.save();x.translate(0,0);v.draw(x,36,18);
+  // menu bar template: flat single colour that follows the bar (white on dark, black on light)
+  x.globalCompositeOperation='source-in';x.fillStyle=m==='d'?'#fff':'#000';x.fillRect(0,0,36,36);
+  e.append(s,'Remote Wake');return e});
+ c.append(...mb);grid.append(c)}
+</script></body></html>

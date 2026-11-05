@@ -33,6 +33,9 @@ class _TerminalPageState extends State<TerminalPage> {
   int id = -1;
   String status = 'connecting...';
   bool ctrl = false;
+  bool direct = false; // false: type in the command bar; true: the terminal itself takes keystrokes
+  final cmd = TextEditingController();
+  final termFocus = FocusNode(), cmdFocus = FocusNode();
   ReceivePort? rp;
   bool reconnecting = false, gaveUp = false;
   int attempt = 0;
@@ -112,8 +115,8 @@ class _TerminalPageState extends State<TerminalPage> {
     final trust = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Host key changed'),
-        content: Text('${widget.name} presented a different SSH key than before (new: $fp). This is normal after reinstalling Tailscale or the Mac, but it could also mean someone is in the way. Trust the new key?'),
+        title: Text('Host key changed', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.sage.warn)),
+        content: Text('${widget.name} presented a different SSH key than before (new: $fp). This is normal after reinstalling Tailscale or the Mac, but it could also mean someone is in the way. Trust the new key?', style: const TextStyle(fontSize: 13, height: 1.5)),
         actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('No')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Trust new key'))],
       ),
     );
@@ -130,29 +133,67 @@ class _TerminalPageState extends State<TerminalPage> {
     Engine.shellWrite(id, base64.encode(utf8.encode(data)));
   }
 
-  Widget _key(BuildContext c, String label, {String? data, bool on = false, VoidCallback? onTap}) {
+  void _line(String text) => _send('$text\r');
+
+  void _setDirect(bool v) {
+    setState(() => direct = v);
+    if (v) { cmdFocus.unfocus(); termFocus.requestFocus(); } else { termFocus.unfocus(); cmdFocus.requestFocus(); }
+  }
+
+  void _submit() {
+    final t = cmd.text;
+    cmd.clear();
+    _line(t);
+    cmdFocus.requestFocus();
+  }
+
+  // A key in the grid: at least 44 x 44 dp.
+  Widget _key(BuildContext c, String label, {String? data, bool on = false, Color? color, VoidCallback? onTap, String? tip, double minW = 44}) {
     final s = c.sage;
     return Padding(
-      padding: const EdgeInsets.only(right: Sp.sm),
-      child: Material(
-        color: on ? s.accent : s.soft,
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: onTap ?? () => _send(data!),
-          child: Container(constraints: const BoxConstraints(minWidth: 44, minHeight: 44), alignment: Alignment.center, padding: const EdgeInsets.symmetric(horizontal: Sp.md),
-              child: Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: on ? s.onAccent : s.text))),
+      padding: const EdgeInsets.only(right: Sp.xs),
+      child: Semantics(
+        button: true, label: tip ?? label, excludeSemantics: true,
+        child: Material(
+          color: on ? s.accent : const Color(0xFF16161C),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: on ? s.accent : s.line)),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: onTap ?? () => _send(data!),
+            child: Container(constraints: BoxConstraints(minWidth: minW, minHeight: 44), alignment: Alignment.center, padding: const EdgeInsets.symmetric(horizontal: Sp.md),
+                child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: on ? s.onAccent : (color ?? s.text)))),
+          ),
         ),
       ),
     );
   }
 
-  // Terminal stays dark in both modes (programs assume a dark screen); colors come from the Sage palette.
+  Widget _chip(BuildContext c, String label, {String? line, String? data, Color? color}) {
+    final s = c.sage;
+    return Padding(
+      padding: const EdgeInsets.only(right: Sp.sm),
+      child: Semantics(
+        button: true, label: label, excludeSemantics: true,
+        child: Material(
+          color: const Color(0xFF16161C),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: s.line)),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => line != null ? _line(line) : _send(data!),
+            child: Container(constraints: const BoxConstraints(minHeight: 44), alignment: Alignment.center, padding: const EdgeInsets.symmetric(horizontal: Sp.md),
+                child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color ?? s.accent))),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Terminal palette from the design: mint / red / amber / blue / pink on near-black.
   static const _theme = TerminalTheme(
-    cursor: Color(0xFF8FBF9A), selection: Color(0xFF2E3A33), foreground: Color(0xFFE4EBE5), background: Color(0xFF151B17),
-    black: Color(0xFF1D2520), red: Color(0xFFE8A097), green: Color(0xFF8FBF9A), yellow: Color(0xFFE5C57A), blue: Color(0xFF8DB4D9), magenta: Color(0xFFC9A3D9), cyan: Color(0xFF7FC8C2), white: Color(0xFFCBD5CD),
-    brightBlack: Color(0xFF5E6B61), brightRed: Color(0xFFF2B8B0), brightGreen: Color(0xFFA8D4B2), brightYellow: Color(0xFFF0D894), brightBlue: Color(0xFFA6C8E8), brightMagenta: Color(0xFFDDBCE8), brightCyan: Color(0xFF9AD9D3), brightWhite: Color(0xFFE4EBE5),
-    searchHitBackground: Color(0xFFE5C57A), searchHitBackgroundCurrent: Color(0xFF8FBF9A), searchHitForeground: Color(0xFF151B17),
+    cursor: Color(0xFFFF6AC1), selection: Color(0xFF2A2A35), foreground: Color(0xFFE8E8EC), background: Color(0xFF050507),
+    black: Color(0xFF1A1A20), red: Color(0xFFE5484D), green: Color(0xFF7BE0B0), yellow: Color(0xFFE3B341), blue: Color(0xFF6CB6FF), magenta: Color(0xFFFF6AC1), cyan: Color(0xFF7FD7D0), white: Color(0xFFC8C8D0),
+    brightBlack: Color(0xFF6B6B78), brightRed: Color(0xFFFF7A7F), brightGreen: Color(0xFF9CF0C8), brightYellow: Color(0xFFF2CB6B), brightBlue: Color(0xFF93C9FF), brightMagenta: Color(0xFFFF93D2), brightCyan: Color(0xFF9FE8E2), brightWhite: Color(0xFFFFFFFF),
+    searchHitBackground: Color(0xFFE3B341), searchHitBackgroundCurrent: Color(0xFF7BE0B0), searchHitForeground: Color(0xFF050507),
   );
 
   (String, Color) _tone(BuildContext c) {
@@ -170,57 +211,105 @@ class _TerminalPageState extends State<TerminalPage> {
     Native.stop();
     rp?.close();
     if (id > 0) Engine.shellClose(id);
+    cmd.dispose(); termFocus.dispose(); cmdFocus.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext c) {
-    final s = c.sage, tone = _tone(c);
+    final s = c.sage, tone = _tone(c), live = id > 0;
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 0,
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(widget.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-          Text('${widget.user}@${widget.ip}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: s.muted)),
+          Text(widget.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          Text('${widget.user}@${widget.ip}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: s.muted)),
         ]),
-        actions: [Padding(padding: const EdgeInsets.only(right: Sp.lg), child: Center(child: StatusWord(tone.$1, tone.$2, key: const Key('tstatus'))))],
+        actions: [
+          StatusWord(tone.$1, tone.$2, key: const Key('tstatus')),
+          IconButton(
+            tooltip: direct ? 'Use the command bar' : 'Type directly in the terminal',
+            icon: Icon(direct ? Icons.keyboard_hide_outlined : Icons.keyboard_outlined, color: direct ? s.accent : s.muted),
+            onPressed: () => _setDirect(!direct),
+          ),
+          const SizedBox(width: Sp.xs),
+        ],
       ),
       body: SafeArea(
-        child: Column(children: [
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (approveUrl != null)
             Banner2(
-              bg: s.warnBg, fg: s.warn, text: 'Tailscale needs you to approve this connection (about every 12 hours).',
-              action: FilledButton(onPressed: () => launchUrl(Uri.parse(approveUrl!), mode: LaunchMode.externalApplication), child: const Text('Approve')),
+              bg: s.pinkBg, fg: s.pink, text: 'Tailscale needs you to approve this connection (about every 12 hours).',
+              action: FilledButton(style: FilledButton.styleFrom(backgroundColor: s.pink, foregroundColor: s.bg), onPressed: () => launchUrl(Uri.parse(approveUrl!), mode: LaunchMode.externalApplication), child: const Text('Approve')),
             ),
           if (reconnecting)
             Banner2(
-              bg: s.dangerBg, fg: s.danger, text: gaveUp ? 'Connection lost' : 'Connection lost, reconnecting...',
-              lead: gaveUp ? null : SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: s.danger)),
-              action: gaveUp ? FilledButton(onPressed: () { attempt = 0; _reconnect(); }, child: const Text('Retry')) : null,
+              bg: s.warnBg, fg: s.warn, text: gaveUp ? 'Connection lost' : 'Connection lost, reconnecting...',
+              lead: gaveUp ? null : SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: s.warn)),
+              action: gaveUp ? FilledButton(style: FilledButton.styleFrom(backgroundColor: s.warn, foregroundColor: s.bg), onPressed: () { attempt = 0; _reconnect(); }, child: const Text('Retry')) : null,
             ),
           const SizedBox(height: Sp.sm),
-          Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: Sp.sm), child: ClipRRect(borderRadius: BorderRadius.circular(12), child: TerminalView(term, autofocus: true, theme: _theme, padding: const EdgeInsets.all(Sp.sm), textStyle: const TerminalStyle(fontSize: 13))))),
-          Container(
-            color: s.card,
-            padding: const EdgeInsets.all(Sp.sm),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(children: [
-                _key(c, 'Esc', data: '\x1b'),
-                _key(c, 'Tab', data: '\t'),
-                _key(c, 'Ctrl', on: ctrl, onTap: () => setState(() => ctrl = !ctrl)),
-                _key(c, '^C', data: '\x03'),
-                _key(c, '^D', data: '\x04'),
-                _key(c, '↑', data: '\x1b[A'),
-                _key(c, '↓', data: '\x1b[B'),
-                _key(c, '←', data: '\x1b[D'),
-                _key(c, '→', data: '\x1b[C'),
-                _key(c, '|', data: '|'),
-                _key(c, '/', data: '/'),
-                _key(c, '-', data: '-'),
-                _key(c, '~', data: '~'),
-              ]),
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: Sp.sm),
+              decoration: BoxDecoration(color: s.screen, borderRadius: BorderRadius.circular(12), border: Border.all(color: direct ? s.accent.withValues(alpha: .6) : s.line)),
+              clipBehavior: Clip.antiAlias,
+              child: TerminalView(term, focusNode: termFocus, readOnly: !direct, theme: _theme, padding: const EdgeInsets.all(Sp.sm), textStyle: const TerminalStyle(fontSize: 13),
+                  onTapUp: (_, _) { if (!direct) _setDirect(true); }),
             ),
           ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(Sp.sm, Sp.sm, Sp.sm, 0),
+            child: Row(children: [
+              _chip(c, 'Stop ^C', data: '\x03', color: s.danger),
+              _chip(c, 'claude', line: 'claude'),
+              _chip(c, 'ls', line: 'ls'),
+              _chip(c, 'git status', line: 'git status'),
+              _chip(c, 'pwd', line: 'pwd'),
+              _chip(c, 'clear', line: 'clear'),
+            ]),
+          ),
+          for (final row in [
+            [('Esc', '\x1b'), ('Tab', '\t'), ('Ctrl', null), ('←', '\x1b[D'), ('↓', '\x1b[B'), ('↑', '\x1b[A'), ('→', '\x1b[C')],
+            [('|', '|'), ('/', '/'), ('~', '~'), ('-', '-'), ('_', '_'), ('*', '*'), ('^D', '\x04')],
+          ])
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(Sp.sm, Sp.sm, Sp.sm, 0),
+              child: Row(children: [
+                for (final k in row)
+                  k.$2 == null
+                      ? _key(c, k.$1, on: ctrl, tip: 'Control, applies to the next key', onTap: () => setState(() => ctrl = !ctrl))
+                      : _key(c, k.$1, data: k.$2),
+              ]),
+            ),
+          if (!direct)
+            Padding(
+              padding: const EdgeInsets.all(Sp.sm),
+              child: Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: cmd, focusNode: cmdFocus, enabled: live,
+                    autocorrect: false, enableSuggestions: false, textCapitalization: TextCapitalization.none, keyboardType: TextInputType.visiblePassword,
+                    textInputAction: TextInputAction.send, onSubmitted: (_) => _submit(),
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(hintText: live ? 'Type a command, press send' : 'Waiting for the connection...', hintStyle: TextStyle(color: s.muted, fontSize: 13), contentPadding: const EdgeInsets.symmetric(horizontal: Sp.md, vertical: Sp.md)),
+                  ),
+                ),
+                const SizedBox(width: Sp.sm),
+                Semantics(
+                  button: true, label: 'Send command', excludeSemantics: true,
+                  child: Material(
+                    color: live ? s.accent : s.soft,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(borderRadius: BorderRadius.circular(12), onTap: live ? _submit : null, child: SizedBox(width: 56, height: 48, child: Icon(Icons.keyboard_return, color: live ? s.onAccent : s.muted))),
+                  ),
+                ),
+              ]),
+            )
+          else
+            const SizedBox(height: Sp.sm),
         ]),
       ),
     );

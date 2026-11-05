@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Remote Wake: terminal-status demo</title>
+<style>
+:root{--bg:#0b0b0e;--panel:#121217;--line:#23232b;--tx:#e8e8ec;--dim:#6b6b78;--ok:#7be0b0;--bad:#e5484d;--warn:#e3b341;--pink:#ff6ac1;--blue:#6cb6ff}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--tx);font:13px/1.6 ui-monospace,"SF Mono",Menlo,monospace;padding:24px 16px}
+.wrap{max-width:1300px;margin:0 auto;display:grid;grid-template-columns:1fr 580px;gap:24px;align-items:start}
+@media(max-width:1100px){.wrap{grid-template-columns:1fr}}
+.phones{display:flex;gap:16px;flex-wrap:wrap}.phones>div{width:278px}
+h1{font-size:12px;font-weight:600;color:var(--dim);letter-spacing:.08em;margin-bottom:12px}
+.win{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.bar{display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid var(--line);align-items:center}
+.bar i{width:10px;height:10px;border-radius:50%;background:#2b2b34}
+.bar span{margin-left:10px;color:var(--dim);font-size:11px}
+.stage{position:relative;background:#050507;height:190px;overflow:hidden}
+canvas{position:absolute;inset:0;width:100%;height:100%}
+.hud{position:absolute;font-size:10.5px;color:var(--dim);line-height:1.4}
+.tl{left:14px;top:12px}.tr{right:14px;top:12px;text-align:right}.bl{left:14px;bottom:10px}.br{right:14px;bottom:10px}
+.hud b{font-weight:500;color:var(--ok)}
+.off .hud b{color:var(--bad)}
+.tbl{padding:14px}
+.kv{display:grid;grid-template-columns:110px 90px 1fr;gap:0 12px;padding:3px 0;border-bottom:1px dashed #1c1c23}
+.kv:last-child{border:0}
+.kv .k{color:var(--dim)}
+.v-ok{color:var(--ok)}.v-bad{color:var(--bad)}.v-warn{color:var(--warn)}
+.kv .x{color:var(--dim);font-size:12px}
+.path{padding:10px 14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--dim);white-space:pre;overflow:hidden;font-size:12px}
+.path b{color:var(--ok);font-weight:500}.off .path b{color:var(--bad)}
+.alert{padding:8px 14px;background:rgba(229,72,77,.1);color:var(--bad);border-bottom:1px solid var(--line);display:none}
+.off .alert{display:block}
+.ctl{display:flex;gap:14px;align-items:center;padding:14px;border-bottom:1px solid var(--line)}
+#tg{font:700 14px/1.15 ui-monospace,Menlo,monospace;white-space:pre;cursor:pointer;padding:8px 6px;border:0;background:transparent;color:var(--dim);text-align:left}
+.off #tg{color:var(--ok);background:rgba(123,224,176,.1);text-shadow:0 0 10px rgba(123,224,176,.6);border-radius:4px}
+#tg:hover{filter:brightness(1.25)}
+button:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
+.log{border-top:1px solid var(--line);padding:8px 0;font-size:12px;height:132px;overflow:hidden}
+.ln{display:flex;padding:0 14px;white-space:pre;gap:10px}
+.ln em{font-style:normal;color:#44444f;width:28px;flex:none}
+.ln.cur{background:rgba(255,106,193,.1);box-shadow:inset 2px 0 var(--pink)}
+.c{color:var(--dim)}.s{color:var(--ok)}.n{color:var(--warn)}.r{color:var(--bad)}.k{color:var(--blue)}
+.phone{border:6px solid #1b1b22;border-radius:34px;background:#050507;overflow:hidden;height:560px;display:flex;flex-direction:column}
+.phone .top{color:var(--dim);font-size:10px;display:flex;justify-content:space-between;padding:12px 14px 0}
+.phone .stage{height:132px;background:transparent}
+.phone .kv{grid-template-columns:70px 1fr;font-size:11.5px;padding:3px 14px}
+.phone .kv .x{display:none}
+.phone .sp{flex:1}
+.keys{display:flex;gap:4px;margin:8px 10px}
+.keys span{flex:1;text-align:center;border:1px solid var(--line);border-radius:6px;font-size:10px;padding:3px 0;color:var(--dim)}
+.tmux{background:var(--ok);color:#06130d;padding:1px 10px;font-size:11px}
+.off .tmux{background:var(--bad);color:#fff}
+.thead{display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line)}
+.thead b{display:block;font-size:13px}.thead small{color:var(--dim);font-size:10.5px}
+.thead .back{font-size:22px;color:var(--ok);padding:0 6px;line-height:1}
+.thead>div{flex:1}
+.ico{color:var(--dim);font-size:18px}
+.bn{display:none;padding:8px 12px;font-size:11.5px;align-items:center;gap:8px;justify-content:space-between}
+.bn.show{display:flex}.bn.rc{background:rgba(227,179,65,.12);color:var(--warn)}.bn.ap{background:rgba(255,106,193,.12);color:var(--pink)}
+.bn button{font:700 11px ui-monospace,monospace;border:1px solid currentColor;background:transparent;color:inherit;border-radius:6px;padding:5px 10px;cursor:pointer}
+.term{flex:1;font:11.5px/1.45 ui-monospace,Menlo,monospace;padding:8px 12px;overflow:hidden;white-space:pre-wrap;word-break:break-all;display:flex;flex-direction:column;justify-content:flex-end}
+.chips{display:flex;gap:6px;padding:6px 10px;overflow-x:auto;scrollbar-width:none}
+.chips button,.kb button{font:12px ui-monospace,monospace;color:var(--tx);background:#16161c;border:1px solid var(--line);border-radius:8px;cursor:pointer;white-space:nowrap}
+.chips button{padding:7px 11px;color:var(--ok)}
+.kb{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;padding:0 10px 6px}
+.kb button{min-height:36px;padding:0}
+.kb .w2{grid-column:span 2}
+.kb button:active,.chips button:active{background:#22222b}
+.kb button.stop{color:var(--bad)}
+.cmd{display:flex;gap:6px;padding:0 10px 8px}
+.cmd input{flex:1;min-width:0;font:13px ui-monospace,monospace;background:#16161c;border:1px solid var(--line);color:var(--tx);border-radius:10px;padding:10px 12px}
+.cmd input:focus{outline:2px solid var(--ok);border-color:transparent}
+.cmd button{font:700 16px ui-monospace,monospace;width:44px;border-radius:10px;border:0;background:var(--ok);color:#06130d;cursor:pointer}
+.cmd.dis{opacity:.4;pointer-events:none}
+.demo{margin-top:10px;font-size:11px;color:var(--dim);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.demo button{font:11px ui-monospace,monospace;color:var(--dim);background:transparent;border:1px solid var(--line);border-radius:999px;padding:3px 10px;cursor:pointer}
+.demo button.on{color:var(--ok);border-color:var(--ok)}
+.note{color:var(--dim);font-size:11px;margin-top:12px}
+</style></head><body>
+<div class="wrap" id="app">
+<main>
+<h1>REMOTE WAKE / DEMO v2: STATUS AS THE HERO</h1>
+<div class="win">
+ <div class="bar"><i></i><i></i><i></i><span>~/remote-wake  ·  zsh</span></div>
+ <div class="stage">
+  <canvas id="big"></canvas>
+  <div class="hud tl">@remote-wake · 2026<br>mode <b id="hm">stay-awake</b></div>
+  <div class="hud tr" id="hT">t 0.00s</div>
+  <div class="hud bl">$ remote-wake status</div>
+  <div class="hud br">live · 30 fps</div>
+ </div>
+ <div class="alert">! this Mac will sleep when the lid closes. Your phone cannot reach it.</div>
+ <div class="ctl"><button id="tg"></button><span class="c" id="hint">Stay-awake is on. Your Mac keeps running with the lid closed (AC only).</span></div>
+ <div class="tbl" id="tbl"></div>
+ <div class="path" id="path"></div>
+ <div class="log" id="log" aria-live="off"></div>
+</div>
+<p class="note">The big word is real text sampled into characters, shaded by a sweeping light. Everything under it is plain monospace readouts: what matters (awake, power, tailscale, phone) sits in rows, colour = state, no gauges.</p>
+</main>
+<aside>
+<div class="phones"><div>
+<h1>PHONE: HOME</h1>
+<div class="phone" id="ph">
+ <div class="top"><span>7:43</span><span>● 5G 74%</span></div>
+ <div class="stage"><canvas id="small"></canvas></div>
+ <div id="pw" style="text-align:center;font:700 26px/1.2 ui-monospace,Menlo,monospace;letter-spacing:.12em;margin:6px 0 4px;color:var(--ok)">AWAKE</div>
+ <div id="ptbl" style="padding:6px 0"></div>
+ <div class="sp"></div>
+ <div class="keys"><span>esc</span><span>tab</span><span>ctrl</span><span>^C</span><span>↑</span><span>↓</span></div>
+</div>
+ </div>
+<div>
+<h1>PHONE: TERMINAL</h1>
+<div class="phone">
+ <div class="top"><span>7:44</span><span>● 5G 74%</span></div>
+ <div class="thead"><span class="back" aria-label="Back">‹</span><div><b>my-macbook</b><small><span class="v-ok">●</span> direct · 0.3s · session "phone"</small></div><span class="ico" title="Menu">⋯</span></div>
+ <div class="bn" id="bn"></div>
+ <div class="term" id="term" aria-live="polite"></div>
+ <div class="chips" aria-label="Quick commands"><button data-c="claude">claude</button><button data-c="ls">ls</button><button data-c="git status">git status</button><button data-c="pwd">pwd</button><button data-c="clear">clear</button></div>
+ <div class="kb" aria-label="Keys">
+  <button data-k="esc">Esc</button><button data-k="tab">Tab</button><button data-k="up" aria-label="Previous command">↑</button><button data-k="down" aria-label="Next command">↓</button><button data-s="|">|</button><button data-s="/">/</button>
+  <button class="stop w2" data-k="c" title="Ctrl+C">Stop · ^C</button><button data-s="~">~</button><button data-s="-">-</button><button data-s="_">_</button><button data-s="*">*</button>
+ </div>
+ <form class="cmd" id="cmd"><input id="inp" placeholder="Type a command, press ↵" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Command"><button aria-label="Run">↵</button></form>
+</div>
+<div class="demo">demo state: <button class="on" data-st="ok">connected</button><button data-st="rc">reconnecting</button><button data-st="ap">needs approval</button></div>
+</div></div>
+</aside>
+</div>
+<script>
+const $=id=>document.getElementById(id),app=$('app');
+let on=true;const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const RAMP=" .:-=+*#%@";
+function rows(){return on?[
+ ['awake','yes','v-ok','since 2d 04h 11m'],
+ ['power','AC','v-ok','94% · charging'],
+ ['lid','closed','v-ok','safe, sleep blocked'],
+ ['tailscale','running','v-ok','100.x.x.x · direct'],
+ ['phone','online','v-ok','last seen 12s ago'],
+ ['ssh','ready','v-ok','tailnet identity, no password']]:[
+ ['awake','no','v-bad','sleeps on lid close'],
+ ['power','AC','v-ok','94% · charging'],
+ ['lid','closed','v-warn','sleep will start'],
+ ['tailscale','running','v-ok','100.x.x.x · direct'],
+ ['phone','online','v-ok','last seen 12s ago'],
+ ['ssh','unreachable','v-bad','Mac asleep → no answer']]}
+function render(){
+ $('pw').textContent=on?'AWAKE':'ASLEEP';$('pw').style.color=on?'var(--ok)':'var(--bad)';
+ $('tbl').innerHTML=rows().map(r=>`<div class="kv"><span class="k">${r[0]}</span><span class="${r[2]}">${r[1]}</span><span class="x">${r[3]}</span></div>`).join('');
+ $('ptbl').innerHTML=rows().slice(0,4).map(r=>`<div class="kv"><span class="k">${r[0]}</span><span class="${r[2]}">${r[1]}</span></div>`).join('');
+ $('hm').textContent=on?'stay-awake':'idle';
+}
+// path: phone ---- mac with a moving packet
+let step=0;
+function path(){const n=34,p=on?step%n:-1;let line='';
+ for(let i=0;i<n;i++)line+=i===p?'<b>●</b>':(on?'─':'╌');
+ $('path').innerHTML=`[phone] ${line} [mac ${on?'<b>awake</b>':'<b>asleep</b>'}]  <span class="c">${on?'direct · 0.3s':'no route'}</span>`;step++}
+// ascii word
+function makeWord(cv,word,cols,rowsN){const off=document.createElement('canvas');off.width=cols;off.height=rowsN;
+ const o=off.getContext('2d');o.fillStyle='#fff';o.textAlign='center';o.textBaseline='middle';
+ const gap=2,L=[...word];o.textAlign='left';let fs=rowsN*1.25,tw;
+ const meas=()=>{o.font=`900 ${fs}px Helvetica,Arial,sans-serif`;return L.map(c=>o.measureText(c).width)};
+ let ws=meas();while((tw=ws.reduce((a,b)=>a+b)+gap*(L.length-1))>cols*.92)ws=(fs-=2,meas());
+ let x=(cols-tw)/2;const sp=[];L.forEach((c,i)=>{o.fillText(c,x,rowsN/2+fs*.04);sp.push([c,x,ws[i]]);x+=ws[i]+gap});
+ const d=o.getImageData(0,0,cols,rowsN).data;
+ // A and W are mirror-symmetric: copy the left half onto the right so rounding cannot make the two sides differ
+ for(const[c,x0,w0]of sp){if(c!=='A'&&c!=='W')continue;
+  const m2=Math.round(2*(x0+w0/2)),lo=Math.floor(x0),hi=Math.ceil(x0+w0);
+  for(let r=0;r<rowsN;r++)for(let k=Math.ceil(m2/2);k<hi&&k<cols;k++){const src=m2-1-k;d[(r*cols+k)*4+3]=src>=lo&&src>=0?d[(r*cols+src)*4+3]:0}}
+ return{cols,rowsN,d}}
+function draw(cv,w,t,cw){
+ const g=cv.getContext('2d'),dpr=devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;
+ if(cv.width!==W*dpr){cv.width=W*dpr;cv.height=H*dpr}
+ g.setTransform(dpr,0,0,dpr,0,0);g.fillStyle='#050507';g.fillRect(0,0,W,H);
+ const ch=cw*1.65,ox=(W-w.cols*cw)/2,oy=(H-w.rowsN*ch)/2;g.font=`${cw*1.5}px ui-monospace,Menlo,monospace`;g.textBaseline='top';
+ const sweep=reduce?.5:((t*.12)%1.6)-.3;
+ for(let r=0;r<w.rowsN;r++)for(let c=0;c<w.cols;c++){
+  const a=w.d[(r*w.cols+c)*4+3]/255;if(a<(r===0||r===w.rowsN-1?.45:.15))continue; // drop faint overshoot cells on the edge rows
+  const lit=Math.max(0,1-Math.abs(c/w.cols-sweep)*4);
+  let b=Math.min(1,.5+(r/w.rowsN)*.15+lit*.4);
+  const chr=RAMP[Math.min(RAMP.length-1,Math.floor(b*RAMP.length))];
+  g.fillStyle=on?`rgb(${50+b*80|0},${110+b*120|0},${90+b*90|0})`:`rgb(${100+b*130|0},${40+b*30|0},${46+b*30|0})`;
+  g.fillText(chr,ox+c*cw,oy+r*ch)}
+ // sparks
+ let s=5;const rn=()=>(s=(s*16807)%2147483647)/2147483647;
+ for(let i=0;i<40;i++){const x=rn()*W,y=rn()*H;g.fillStyle='rgba(255,255,255,.4)';g.fillRect(x,y,1,1);
+  if(i%9===0){const k=.5+.5*Math.sin(t*2+i);g.strokeStyle=`rgba(255,255,255,${.3*k})`;g.beginPath();g.moveTo(x-6,y);g.lineTo(x+6,y);g.moveTo(x,y-6);g.lineTo(x,y+6);g.stroke()}}}
+let words={};
+const LW=28,pad=(t,w,f=' ')=>{const n=w-t.length,l=n>>1;return f.repeat(l)+t+f.repeat(n-l)};
+const LAP=[pad('.'+'-'.repeat(22)+'.',LW),...Array(5).fill(pad('|'+'#'.repeat(22)+'|',LW)),
+ pad("'"+'-'.repeat(22)+"'",LW),".-'"+'-'.repeat(22)+"'-.","'"+'-'.repeat(26)+"'"];
+console.assert(LAP.every(r=>r.length===LW),'laptop rows must all be '+LW+' wide');
+function laptop(cv,t){
+ const g=cv.getContext('2d'),dpr=devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;
+ if(cv.width!==W*dpr){cv.width=W*dpr;cv.height=H*dpr}
+ g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,W,H);
+ const cw=8.4,ch=14,ox=(W-LW*cw)/2,oy=(H-LAP.length*ch)/2;g.font='13px ui-monospace,Menlo,monospace';g.textBaseline='top';
+ const col=on?'123,224,176':'229,72,77';
+ LAP.forEach((row,r)=>[...row].forEach((c,i)=>{
+  if(c===' ')return;let chr=c,a=.55;
+  if(c==='#'){ // screen: flowing light when awake, mostly dark with zz when asleep
+   if(on){const b=.5+.5*Math.sin(i*.45-t*2.2+r*.7);chr=RAMP[Math.floor(3+b*6)];a=.35+b*.65}
+   else{const z=(i*7+r*13)%29===0;chr=z?'z':' ';a=.7;if(chr===' ')return}}
+  g.fillStyle=`rgba(${col},${a})`;g.fillText(chr,ox+i*cw,oy+r*ch)}));}
+function loadWords(){words={on:[makeWord(0,'AWAKE',64,11),makeWord(0,'AWAKE',30,8)],off:[makeWord(0,'ASLEEP',64,11),makeWord(0,'ASLEEP',30,8)]}}
+loadWords();
+const t0=performance.now();
+function frame(now){const t=(now-t0)/1000,k=on?'on':'off';
+ draw($('big'),words[k][0],t,9);laptop($('small'),t);
+ $('hT').textContent='t '+t.toFixed(2)+'s';requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+// event log
+const stamp=()=>new Date().toTimeString().slice(0,8);
+const logs=[];function log(msg){logs.push([stamp(),msg]);if(logs.length>6)logs.shift();
+ $('log').innerHTML=logs.map((l,i)=>`<div class="ln ${i===logs.length-1?'cur':''}"><em>${i+1}</em><span class="c">${l[0]}</span>${l[1]}</div>`).join('')}
+log('<span class="s">tailscale</span> running, direct path to phone');
+log('<span class="s">daemon</span> caffeinate -s active');
+log('<span class="k">phone</span> connected · 0.3s');
+$('tg').onclick=()=>{on=!on;app.classList.toggle('off',!on);btn();
+ $('hint').innerHTML=on?'Stay-awake is on. Your Mac keeps running with the lid closed (AC only).':'<span class="v-bad">Action needed:</span> press this so your phone can reach the Mac.';render();
+ log(on?'<span class="s">daemon</span> caffeinate -s started':'<span class="r">daemon</span> stopped · Mac may sleep')};
+const BR=" .:-=+*#%@";
+function btn(t=0){const L=on?'Stop staying awake':'▶ KEEP MY MAC AWAKE',w=L.length+4;
+ const edge=n=>[...Array(n)].map((_,i)=>on?'-':BR[Math.floor(4+(.5+.5*Math.sin(i*.5-t*3))*5)]).join('');
+ const b=$('tg');b.setAttribute('aria-label',L);
+ b.textContent='+'+edge(w)+'+\n|  '+L+'  |\n+'+edge(w)+'+'}
+let bt=0;setInterval(()=>{if(!on&&!reduce)btn(bt+=.12)},100);btn();
+render();path();setInterval(path,120);
+setInterval(()=>{if(on&&!reduce)log('<span class="k">phone</span> keepalive ok · <span class="n">'+(.2+Math.random()*.2).toFixed(2)+'s</span>')},6000);
+
+// terminal demo
+const T=$('term'),I=$('inp');let hist=[],hi=0,out=[];
+const P='<span class="s">$</span> ';
+const OUT={ls:'<span class="k">Desktop</span>  <span class="k">Documents</span>  <span class="k">projects</span>\nnotes.txt',pwd:'/Users/guru',
+ 'git status':'On branch main\nnothing to commit, working tree clean',
+ claude:'<span class="c">╭──────────────────╮\n│ ✻ Welcome back   │\n╰──────────────────╯</span>'};
+function show(){T.innerHTML=out.slice(-16).join('\n')}
+function run(c){c=c.trim();out.push(P+c);if(c)hist.push(c),hi=hist.length;
+ if(c==='clear')out=[];else if(c)out.push(OUT[c]??'<span class="r">zsh: command not found: '+c.replace(/</g,'&lt;')+'</span>');show()}
+out=['<span class="c">Connected to my-macbook.\nTip: tap a quick command or type below.</span>',P+'<span class="c">_</span>'];out.pop();out.push(P);show();
+// first prompt is a placeholder line; replace on first run
+$('cmd').onsubmit=e=>{e.preventDefault();if(out[out.length-1]===P)out.pop();run(I.value);I.value=''};
+document.querySelectorAll('.chips [data-c]').forEach(b=>b.onclick=()=>{if(out[out.length-1]===P)out.pop();run(b.dataset.c)});
+document.querySelectorAll('.kb [data-s]').forEach(b=>b.onclick=()=>{I.value+=b.dataset.s;I.focus()});
+document.querySelectorAll('.kb [data-k]').forEach(b=>b.onclick=()=>{const k=b.dataset.k;
+ if(k==='up'&&hi>0)I.value=hist[--hi]||'';else if(k==='down')I.value=hist[++hi]||'';
+ else if(k==='c'){out.push(P+I.value+'<span class="r">^C</span>');I.value='';show()}
+ else if(k==='tab')I.value+='  ';else if(k==='esc')I.value=''});
+// connection states
+const BN={rc:['<span>Connection lost, reconnecting… (try 2 of 10)</span>',''],ap:['<span>Tailscale needs you to approve this connection</span>','<button>Approve</button>']};
+document.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{const k=b.dataset.st,n=$('bn');
+ document.querySelectorAll('[data-st]').forEach(x=>x.classList.toggle('on',x===b));
+ n.className='bn'+(k==='ok'?'':' show '+k);n.innerHTML=k==='ok'?'':BN[k][0]+BN[k][1];$('cmd').classList.toggle('dis',k!=='ok')});
+</script></body></html>

@@ -37,15 +37,15 @@ class _TutorialPageState extends State<TutorialPage> {
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Container(
           width: 28, height: 28, alignment: Alignment.center,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: done ? s.accent : (active ? s.soft : null), border: done ? null : Border.all(color: s.line)),
-          child: done ? Icon(Icons.check, size: 16, color: s.onAccent) : Text('$n', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: active ? s.text : s.muted)),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: done ? s.accent : (active ? s.soft : null), border: done ? null : Border.all(color: active ? s.accent : s.line)),
+          child: done ? Icon(Icons.check, size: 16, color: s.onAccent) : Text('$n', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: active ? s.accent : s.muted)),
         ),
         const SizedBox(width: Sp.md),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Padding(padding: const EdgeInsets.only(top: Sp.xs), child: Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: done || active ? s.text : s.muted))),
+          Padding(padding: const EdgeInsets.only(top: Sp.xs), child: Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: done || active ? s.text : s.muted))),
           if (active) ...[
             const SizedBox(height: Sp.sm),
-            Text(body, style: TextStyle(color: s.muted, fontSize: 15, height: 1.4)),
+            Text(body, style: TextStyle(color: s.muted, fontSize: 13, height: 1.4)),
             if (action != null) ...[const SizedBox(height: Sp.md), action],
           ],
         ])),
@@ -66,17 +66,17 @@ class _TutorialPageState extends State<TutorialPage> {
       (Icons.lock_outline, 'After a power cut with FileVault on, the Mac waits for its password and cannot be reached until someone unlocks it.'),
     ];
     return Scaffold(
-      appBar: AppBar(title: const Text('Set up')),
+      appBar: AppBar(title: const Text('\$ setup')),
       body: ListView(padding: const EdgeInsets.all(Sp.lg), children: [
-        Text('Reach your Mac from here', style: Theme.of(c).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+        const Text('Reach your Mac from here', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
         const SizedBox(height: Sp.sm),
-        Text('Three quick steps. Each one ticks itself when it is done.', style: TextStyle(color: s.muted, fontSize: 15)),
+        Text('Three quick steps. Each one ticks itself when it is done.', style: TextStyle(color: s.muted, fontSize: 13, height: 1.4)),
         const SizedBox(height: Sp.xl),
         AppCard(child: Column(children: [
           _step(c, 1, 'Sign in to Tailscale', 'Use the same account as on your Mac.', done[0], cur == 0,
-              FilledButton(onPressed: url.isEmpty ? null : () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication), child: Text(url.isEmpty ? 'Starting...' : 'Sign in'))),
+              AsciiButton(url.isEmpty ? 'Starting...' : 'Sign in', onPressed: url.isEmpty ? null : () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication))),
           _step(c, 2, 'Keep the app running', 'Android may stop your session when the screen is off. Allow it when asked.', done[1], cur == 1,
-              FilledButton(onPressed: () async { await Store.setAskedBattery(); await Native.batteryExempt(); if (mounted) setState(() => battery = true); }, child: const Text('Allow'))),
+              AsciiButton('Allow', onPressed: () async { await Store.setAskedBattery(); await Native.batteryExempt(); if (mounted) setState(() => battery = true); })),
           _step(c, 3, 'Find your Mac', 'On the Mac, open Remote Wake and finish its setup. It shows up here by itself.', done[2], cur == 2),
         ])),
         if (macs.isNotEmpty) ...[
@@ -89,9 +89,8 @@ class _TutorialPageState extends State<TutorialPage> {
               child: Row(children: [
                 Icon(Icons.laptop_mac, color: s.accent),
                 const SizedBox(width: Sp.md),
-                Expanded(child: Text('${p['name']}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600))),
-                Text('Connect', style: TextStyle(color: s.accent, fontWeight: FontWeight.w600)),
-                Icon(Icons.chevron_right, color: s.accent),
+                Expanded(child: Text('${p['name']}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+                Text('Connect >', style: TextStyle(color: s.accent, fontWeight: FontWeight.w700)),
               ]),
             ),
         ],
@@ -104,7 +103,7 @@ class _TutorialPageState extends State<TutorialPage> {
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Icon(tips[i].$1, size: 20, color: s.accent),
               const SizedBox(width: Sp.md),
-              Expanded(child: Text(tips[i].$2, style: const TextStyle(fontSize: 14, height: 1.4))),
+              Expanded(child: Text(tips[i].$2, style: const TextStyle(fontSize: 12, height: 1.5))),
             ]),
           ),
         ])),

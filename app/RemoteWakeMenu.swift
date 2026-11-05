@@ -171,70 +171,170 @@ func tsPath() -> String? { ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tails
 }
 
 
-// MARK: - Sage design language (see design/tokens.md). Spacing uses only S.*; colors adapt to Light/Dark automatically.
+// MARK: - Terminal-bloom design language (see design/tokens.md and design/rose-style.html). Dark only; spacing uses only S.*.
 import CoreText
 
 extension Color { init(hex: UInt32) { self.init(red: Double((hex >> 16) & 255) / 255, green: Double((hex >> 8) & 255) / 255, blue: Double(hex & 255) / 255) } }
-func dyn(_ l: UInt32, _ d: UInt32) -> Color {
-    Color(nsColor: NSColor(name: nil) { a in a.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(Color(hex: d)) : NSColor(Color(hex: l)) })
-}
 enum T {
-    static let bg = dyn(0xEEF2EC, 0x151B17), card = dyn(0xF8FAF6, 0x1D2520), soft = dyn(0xDDE7DA, 0x24302A), line = dyn(0xD3DCCF, 0x2E3A33)
-    static let text = dyn(0x2F3A33, 0xE4EBE5), muted = dyn(0x5E6B61, 0x9BAB9F), accent = dyn(0x4F7A5A, 0x8FBF9A), onAccent = dyn(0xFFFFFF, 0x11201A)
-    static let warn = dyn(0x7A5A12, 0xE5C57A), warnBg = dyn(0xF6EBD3, 0x2B2616)
+    static let bg = Color(hex: 0x0B0B0E), card = Color(hex: 0x121217), soft = Color(hex: 0x1A1A21), line = Color(hex: 0x23232B)
+    static let text = Color(hex: 0xE8E8EC), muted = Color(hex: 0x8A8A98), dim = Color(hex: 0x6B6B78)   // muted passes 4.5:1 on card; dim is for decoration only
+    static let accent = Color(hex: 0x7BE0B0), onAccent = Color(hex: 0x06130D), pink = Color(hex: 0xFF6AC1)
+    static let warn = Color(hex: 0xE3B341), warnBg = Color(hex: 0x2B251C), danger = Color(hex: 0xE5484D), dangerBg = Color(hex: 0x2B181D)
+    static let stage = Color(hex: 0x050507)
 }
 enum S { static let xs: CGFloat = 4, sm: CGFloat = 8, md: CGFloat = 12, lg: CGFloat = 16, xl: CGFloat = 24, xxl: CGFloat = 32 }
-func ff(_ size: CGFloat, _ w: Font.Weight = .regular) -> Font { .custom("Figtree", size: size).weight(w) }
-func registerFonts() { CTFontManagerRegisterFontsForURL(URL(fileURLWithPath: resRoot + "/Fonts/Figtree.ttf") as CFURL, .process, nil) }
+func ff(_ size: CGFloat, _ w: Font.Weight = .regular) -> Font { .system(size: size, weight: w, design: .monospaced) }
+var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 
 struct Card: ViewModifier {
     var tint = false
     func body(content: Content) -> some View {
         content.padding(S.lg).frame(maxWidth: .infinity, alignment: .leading)
-            .background(tint ? T.soft : T.card, in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(T.line, lineWidth: 1))
+            .background(tint ? T.soft : T.card, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(T.line, lineWidth: 1))
     }
 }
 extension View { func card(tint: Bool = false) -> some View { modifier(Card(tint: tint)) } }
 
-struct Pill: ButtonStyle {
-    var primary = true
+// The button: a frame of characters. When it is the action the user must take, the border ripples (shaded characters); otherwise it is a still, dim frame.
+struct AsciiButton: View {
+    let title: String, primary: Bool, action: () -> Void
     @Environment(\.isEnabled) var enabled
-    func makeBody(configuration c: Configuration) -> some View {
-        c.label.font(ff(14, .semibold)).padding(.horizontal, S.lg).frame(height: 36)
-            .foregroundStyle(primary ? T.onAccent : T.text)
-            .background(primary ? T.accent : Color.clear, in: Capsule())
-            .overlay(Capsule().stroke(primary ? Color.clear : T.line, lineWidth: 1))
-            .opacity(enabled ? (c.isPressed ? 0.8 : 1) : 0.45)
+    init(_ title: String, primary: Bool = true, action: @escaping () -> Void) { self.title = title; self.primary = primary; self.action = action }
+    static let ramp = Array(" .:-=+*#%@")
+    func art(_ t: Double, live: Bool) -> String {
+        let w = title.count + 4
+        let edge = String((0..<w).map { i in live ? Self.ramp[Int(4 + (0.5 + 0.5 * sin(Double(i) * 0.5 - t * 3)) * 5)] : "-" })
+        return "+\(edge)+\n|  \(title)  |\n+\(edge)+"
+    }
+    var body: some View {
+        let live = primary && enabled && !reduceMotion
+        Button(action: action) {
+            TimelineView(.animation(minimumInterval: 0.1, paused: !live)) { tl in
+                Text(art(tl.date.timeIntervalSinceReferenceDate, live: live))
+                    .font(ff(13, .bold)).lineSpacing(0).fixedSize()
+                    .foregroundStyle(primary ? T.accent : T.muted)
+                    .padding(.horizontal, S.sm).padding(.vertical, S.xs)
+                    .background(primary ? T.accent.opacity(0.10) : Color.clear, in: RoundedRectangle(cornerRadius: 4))
+                    .shadow(color: primary && enabled ? T.accent.opacity(0.45) : .clear, radius: 8)
+            }
+        }
+        .buttonStyle(.plain).opacity(enabled ? 1 : 0.45)
+        .accessibilityLabel(title)
     }
 }
 struct Quiet: ButtonStyle {
-    func makeBody(configuration c: Configuration) -> some View { c.label.font(ff(14, .medium)).foregroundStyle(T.muted).opacity(c.isPressed ? 0.6 : 1) }
+    func makeBody(configuration c: Configuration) -> some View { c.label.font(ff(13, .medium)).foregroundStyle(T.muted).opacity(c.isPressed ? 0.6 : 1) }
 }
 
-struct Status: View {   // the one way status is shown everywhere: dot + word
+struct Status: View {   // the one way status is shown everywhere: glowing dot + word
     let word: String, color: Color
-    var body: some View { HStack(spacing: S.sm) { Circle().fill(color).frame(width: 8, height: 8); Text(word).font(ff(13, .semibold)).foregroundStyle(color) } }
+    var body: some View { HStack(spacing: S.sm) { Circle().fill(color).frame(width: 8, height: 8).shadow(color: color, radius: 4); Text(word).font(ff(13, .semibold)).foregroundStyle(color) } }
 }
 
 struct InfoRow<Trailing: View>: View {
-    let icon: String, label: String
+    let label: String
     @ViewBuilder var trailing: Trailing
     var body: some View {
         HStack(spacing: S.md) {
-            Image(systemName: icon).font(.system(size: 15)).foregroundStyle(T.muted).frame(width: 22)
-            Text(label).font(ff(15)).foregroundStyle(T.text)
-            Spacer(minLength: S.md)
+            Text(label).font(ff(13)).foregroundStyle(T.muted).frame(width: 104, alignment: .leading)
             trailing
-        }.frame(minHeight: 32)
+            Spacer(minLength: 0)
+        }.frame(minHeight: 28)
     }
 }
-func value(_ s: String) -> some View { Text(s).font(ff(15)).foregroundStyle(T.muted).lineLimit(1) }
+func value(_ s: String) -> some View { Text(s).font(ff(13)).foregroundStyle(T.text).lineLimit(1) }
+
+// ASCII word: the text is rasterised into a character grid, then each filled cell is drawn as a character whose density follows a light sweeping across.
+struct WordGrid { let cols: Int, rows: Int, a: [UInt8] }
+func makeWord(_ word: String, cols: Int, rows: Int) -> WordGrid {
+    let chars = Array(word), gap: CGFloat = 2
+    func font(_ s: CGFloat) -> NSFont { NSFont.systemFont(ofSize: s, weight: .black) }
+    func widths(_ s: CGFloat) -> [CGFloat] { chars.map { NSAttributedString(string: String($0), attributes: [.font: font(s)]).size().width } }
+    var fs = CGFloat(rows) * 1.25, ws = widths(fs)
+    func total() -> CGFloat { ws.reduce(0, +) + gap * CGFloat(chars.count - 1) }
+    while total() > CGFloat(cols) * 0.92 { fs -= 2; ws = widths(fs) }
+    var data = [UInt8](repeating: 0, count: cols * rows)
+    var spans: [(Character, CGFloat, CGFloat)] = []
+    data.withUnsafeMutableBytes { buf in
+        guard let ctx = CGContext(data: buf.baseAddress, width: cols, height: rows, bitsPerComponent: 8, bytesPerRow: cols, space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return }
+        NSGraphicsContext.saveGraphicsState(); NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
+        let f = font(fs), y = (CGFloat(rows) - f.capHeight) / 2 + f.descender
+        var x = (CGFloat(cols) - total()) / 2
+        for (i, c) in chars.enumerated() {
+            NSAttributedString(string: String(c), attributes: [.font: f, .foregroundColor: NSColor.white]).draw(at: NSPoint(x: x, y: y))
+            spans.append((c, x, ws[i])); x += ws[i] + gap
+        }
+        NSGraphicsContext.restoreGraphicsState()
+    }
+    // A and W are mirror-symmetric: copy the left half onto the right so grid rounding cannot make the two sides differ
+    for (c, x0, w0) in spans where c == "A" || c == "W" {
+        let m2 = Int((2 * (x0 + w0 / 2)).rounded()), lo = Int(floor(x0)), hi = Int(ceil(x0 + w0))
+        for r in 0..<rows { var k = (m2 + 1) / 2; while k < hi && k < cols { let src = m2 - 1 - k; data[r * cols + k] = src >= lo && src >= 0 ? data[r * cols + src] : 0; k += 1 } }
+    }
+    return WordGrid(cols: cols, rows: rows, a: data)
+}
+@MainActor var wordCache: [String: WordGrid] = [:]
+@MainActor func word(_ w: String) -> WordGrid { if let g = wordCache[w] { return g }; let g = makeWord(w, cols: 62, rows: 10); wordCache[w] = g; return g }
+
+struct AsciiWord: View {
+    let grid: WordGrid, color: Color
+    static let cw: CGFloat = 5.7, ch: CGFloat = 10.5
+    var body: some View {
+        let live = !reduceMotion
+        TimelineView(.animation(minimumInterval: 1.0 / 15, paused: !live)) { tl in
+            Canvas { ctx, size in
+                let t = live ? tl.date.timeIntervalSinceReferenceDate : 8
+                var seed: UInt64 = 7
+                func rnd() -> CGFloat { seed = (seed &* 16807) % 2147483647; return CGFloat(seed) / 2147483647 }
+                for i in 0..<60 {
+                    let x = rnd() * size.width, y = rnd() * size.height
+                    ctx.fill(Path(CGRect(x: x, y: y, width: 1, height: 1)), with: .color(.white.opacity(0.4)))
+                    if i % 12 == 0 {
+                        let k = 0.5 + 0.5 * sin(t * 2 + Double(i)), p = Path { p in p.move(to: CGPoint(x: x - 6, y: y)); p.addLine(to: CGPoint(x: x + 6, y: y)); p.move(to: CGPoint(x: x, y: y - 6)); p.addLine(to: CGPoint(x: x, y: y + 6)) }
+                        ctx.stroke(p, with: .color(.white.opacity(0.3 * k)), lineWidth: 1)
+                    }
+                }
+                let ramp = Array(" .:-=+*#%@")
+                let glyphs = ramp.map { ctx.resolve(Text(String($0)).font(.system(size: 9.5, weight: .regular, design: .monospaced)).foregroundColor(color)) }
+                let ox = (size.width - CGFloat(grid.cols) * Self.cw) / 2, oy = (size.height - CGFloat(grid.rows) * Self.ch) / 2
+                let sweep = (t * 0.12).truncatingRemainder(dividingBy: 1.6) - 0.3
+                for r in 0..<grid.rows { for c in 0..<grid.cols {
+                    let a = Double(grid.a[r * grid.cols + c]) / 255
+                    if a < (r == 0 || r == grid.rows - 1 ? 0.45 : 0.15) { continue }   // faint overshoot on the edge rows reads as stray characters
+                    let lit = max(0, 1 - abs(Double(c) / Double(grid.cols) - sweep) * 4)
+                    let b = min(1, 0.5 + Double(r) / Double(grid.rows) * 0.15 + lit * 0.4)
+                    ctx.opacity = 0.45 + 0.55 * b
+                    ctx.draw(glyphs[min(9, Int(b * 10))], at: CGPoint(x: ox + CGFloat(c) * Self.cw, y: oy + CGFloat(r) * Self.ch), anchor: .topLeading)
+                } }
+            }
+        }
+          .frame(height: 140).frame(maxWidth: .infinity).background(T.stage, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(T.line, lineWidth: 1))
+        .accessibilityLabel("Status")
+    }
+}
+
+// [phone] ───●─── [mac awake]: the dot moves while the phone can reach an awake Mac.
+struct PathLine: View {
+    let live: Bool, phoneOnline: Bool, macWord: String
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 0.12, paused: !live || reduceMotion)) { tl in
+            let n = 30, p = live ? Int(tl.date.timeIntervalSinceReferenceDate / 0.12) % n : -1
+            let line = (0..<n).map { $0 == p ? "●" : (live ? "─" : "╌") }.joined()
+            HStack(spacing: 0) {
+                Text("[phone] ").foregroundStyle(phoneOnline ? T.muted : T.danger)
+                Text(line).foregroundStyle(live ? T.accent : T.danger)
+                Text(" [mac \(macWord)]").foregroundStyle(live ? T.accent : T.danger)
+            }.font(ff(11)).lineLimit(1).minimumScaleFactor(0.7)
+        }
+    }
+}
 
 struct Logo: View {
     var size: CGFloat = 36
     var body: some View {
-        ZStack { RoundedRectangle(cornerRadius: size * 0.3).fill(T.accent); Image(systemName: "moon.zzz.fill").font(.system(size: size * 0.5)).foregroundStyle(T.onAccent) }.frame(width: size, height: size)
+        if let img = NSImage(contentsOfFile: resRoot + "/logo.png") { Image(nsImage: img).resizable().interpolation(.high).frame(width: size, height: size).accessibilityHidden(true) }
     }
 }
 
@@ -246,7 +346,7 @@ extension Model {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
     }
     var ready: Bool { installed && tsState != "not installed" }
-    var awakeWord: (String, Color) { !running ? ("Off", T.muted) : (holding ? ("Awake", T.accent) : ("Waiting for AC", T.warn)) }
+    var awakeWord: (String, Color) { !running ? ("Off", T.danger) : (holding ? ("Awake", T.accent) : ("Waiting for AC", T.warn)) }
     var heroTitle: String { !running ? "Stay awake is off" : (holding ? "Your Mac is staying awake" : "Ready, but on battery") }
     var heroText: String { !running ? "Your Mac sleeps normally." : (holding ? "Safe to close the lid while it is plugged in." : "Plug in to keep it awake. On battery it sleeps normally.") }
     var stayAwake: Binding<Bool> { Binding(get: { self.running }, set: { _ in self.toggle() }) }
@@ -255,10 +355,10 @@ extension Model {
 struct TailscaleRow: View {
     @ObservedObject var m: Model
     var body: some View {
-        InfoRow(icon: "network", label: "Tailscale") {
-            if m.tsState == "Running" { value(m.tsIP) }
-            else if m.tsState == "NeedsLogin", let u = m.authURL, let url = URL(string: u) { Button("Sign in") { NSWorkspace.shared.open(url) }.buttonStyle(Pill()) }
-            else { Button("Connect") { m.connect() }.buttonStyle(Pill()) }
+        InfoRow(label: "Tailscale") {
+            if m.tsState == "Running" { Status(word: "running", color: T.accent); value(m.tsIP) }
+            else if m.tsState == "NeedsLogin", let u = m.authURL, let url = URL(string: u) { AsciiButton("SIGN IN") { NSWorkspace.shared.open(url) } }
+            else { AsciiButton("CONNECT") { m.connect() } }
         }
     }
 }
@@ -270,11 +370,8 @@ struct StepRow<A: View>: View {
     @ViewBuilder var action: A
     var body: some View {
         HStack(alignment: .top, spacing: S.md) {
-            ZStack {
-                Circle().fill(done ? T.accent : (active ? T.soft : Color.clear)).overlay(Circle().stroke(done ? Color.clear : T.line, lineWidth: 1))
-                if done { Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundStyle(T.onAccent) }
-                else { Text("\(n)").font(ff(13, .semibold)).foregroundStyle(active ? T.text : T.muted) }
-            }.frame(width: 28, height: 28)
+            Text(done ? "[x]" : (active ? "[>]" : "[ ]")).font(ff(14, .bold)).foregroundStyle(done ? T.accent : (active ? T.pink : T.dim))
+                .frame(width: 32, height: 28, alignment: .leading).accessibilityLabel(done ? "Done" : (active ? "Current step" : "Not yet"))
             VStack(alignment: .leading, spacing: S.sm) {
                 Text(title).font(ff(16, .semibold)).foregroundStyle(done || active ? T.text : T.muted).frame(minHeight: 28, alignment: .leading)
                 if active {
@@ -299,18 +396,18 @@ struct SetupView: View {
             }
             VStack(alignment: .leading, spacing: S.lg) {
                 StepRow(n: 1, title: "Install", text: "Adds Tailscale and the stay-awake service. You'll be asked for your Mac password once.", done: done[0], active: cur == 0) {
-                    Button("Install") { m.install() }.buttonStyle(Pill()).disabled(m.busy)
+                    AsciiButton("INSTALL") { m.install() }.disabled(m.busy)
                 }
                 StepRow(n: 2, title: "Connect Tailscale", text: "Sign in with the account you'll also use on your phone.", done: done[1], active: cur == 1) {
-                    if m.tsState == "NeedsLogin", let u = m.authURL, let url = URL(string: u) { Button("Sign in to Tailscale") { NSWorkspace.shared.open(url) }.buttonStyle(Pill()) }
-                    else { Button("Connect Tailscale") { m.connect() }.buttonStyle(Pill()) }
+                    if m.tsState == "NeedsLogin", let u = m.authURL, let url = URL(string: u) { AsciiButton("SIGN IN TO TAILSCALE") { NSWorkspace.shared.open(url) } }
+                    else { AsciiButton("CONNECT TAILSCALE") { m.connect() } }
                 }
                 StepRow(n: 3, title: "Stay awake on AC", text: "Turn this on. Keep the Mac plugged in; on battery it sleeps normally.", done: done[2], active: cur == 2) {
-                    Toggle("Stay awake on AC", isOn: m.stayAwake).toggleStyle(.switch).tint(T.accent).font(ff(14)).disabled(m.busy)
+                    AsciiButton("KEEP MY MAC AWAKE") { m.toggle() }.disabled(m.busy)
                 }
                 if m.needsPerms {
                     StepRow(n: 4, title: "Allow phone access", text: permText, done: m.permsOK, active: cur == 3) {
-                        Button("Allow access") { m.grantAccess() }.buttonStyle(Pill())
+                        AsciiButton("ALLOW ACCESS") { m.grantAccess() }
                     }
                 }
             }.card()
@@ -319,18 +416,41 @@ struct SetupView: View {
     }
 }
 
+@MainActor @ViewBuilder func phoneStatus(_ m: Model) -> some View {
+    let ph = m.phones.first, online = ph != nil && !(ph!.hasSuffix("(offline)"))
+    HStack(spacing: S.md) { Status(word: ph == nil ? "none" : (online ? "online" : "offline"), color: ph == nil ? T.muted : (online ? T.accent : T.danger)); if let ph { value(ph.replacingOccurrences(of: " (offline)", with: "")) } }
+}
+
+// The one thing that matters: is the Mac staying awake? A big ASCII word, the path to the phone, and the action when action is needed.
+struct Hero: View {
+    @ObservedObject var m: Model
+    var info: (String, Color) { !m.running ? ("ASLEEP", T.danger) : (m.holding ? ("AWAKE", T.accent) : ("PLUG IN", T.warn)) }
+    var phoneOnline: Bool { m.phones.first.map { !$0.hasSuffix("(offline)") } ?? false }
+    var body: some View {
+        VStack(alignment: .leading, spacing: S.md) {
+            AsciiWord(grid: word(info.0), color: info.1)
+            PathLine(live: m.running && m.holding && phoneOnline, phoneOnline: phoneOnline, macWord: m.running && m.holding ? "awake" : "asleep")
+            Text(m.heroText).font(ff(13)).foregroundStyle(T.muted).fixedSize(horizontal: false, vertical: true)
+            if !m.running {
+                Text("! Action needed: your phone cannot reach this Mac while it sleeps.").font(ff(12, .semibold)).foregroundStyle(T.danger).fixedSize(horizontal: false, vertical: true)
+                AsciiButton("KEEP MY MAC AWAKE") { m.toggle() }.disabled(m.busy)
+            } else {
+                AsciiButton("STOP STAYING AWAKE", primary: false) { m.toggle() }.disabled(m.busy)
+            }
+        }.card()
+    }
+}
+
 struct PhoneCard: View {
     @ObservedObject var m: Model
     var body: some View {
-        if let ph = m.phones.first {
-            InfoRow(icon: "iphone", label: "Phone") { value(ph) }.card()
-        } else {
+        if m.phones.first == nil {
             VStack(alignment: .leading, spacing: S.md) {
                 Text("Add your phone").font(ff(17, .semibold)).foregroundStyle(T.text)
                 Text("1. Install the phone app on your Android phone.\n2. Open it and sign in to Tailscale with the same account.\n3. Tap this Mac in the list.")
                     .font(ff(14)).foregroundStyle(T.muted).lineSpacing(S.xs).fixedSize(horizontal: false, vertical: true)
                 if FileManager.default.fileExists(atPath: resRoot + "/RemoteWake.apk") {
-                    Button("Show phone app in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: resRoot + "/RemoteWake.apk")]) }.buttonStyle(Pill())
+                    AsciiButton("SHOW PHONE APP IN FINDER") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: resRoot + "/RemoteWake.apk")]) }
                 }
             }.card()
         }
@@ -345,7 +465,7 @@ struct PermsCard: View {
                 Text("Allow phone access").font(ff(17, .semibold)).foregroundStyle(T.text)
                 Text(permText).font(ff(14)).foregroundStyle(T.muted).fixedSize(horizontal: false, vertical: true)
                 if !m.perms.isEmpty { Status(word: "Still needed: " + m.permsMissing, color: T.warn) }
-                Button("Allow access") { m.grantAccess() }.buttonStyle(Pill())
+                AsciiButton("ALLOW ACCESS") { m.grantAccess() }
             }.card()
         }
     }
@@ -378,7 +498,7 @@ struct HelpSheet: View {
     let tips = [("clock.arrow.circlepath", "About every 12 hours Tailscale asks your phone to approve a connection in the browser. The phone app shows an Approve button."),
                 ("arrow.triangle.2.circlepath", "If the connection drops, the phone reconnects. With Phone sessions on, your programs keep running and you land back in the same session."),
                 ("lock.shield", "After a power cut with FileVault on, this Mac waits for its password at startup and cannot be reached until someone unlocks it."),
-                ("menubar.rectangle", "The moon icon in the menu bar stays when you close this window or quit the app.")]
+                ("menubar.rectangle", "The Remote Wake icon in the menu bar stays when you close this window or quit the app.")]
     var body: some View {
         VStack(alignment: .leading, spacing: S.lg) {
             Text("Good to know").font(ff(20, .bold)).foregroundStyle(T.text)
@@ -390,7 +510,7 @@ struct HelpSheet: View {
                     }
                 }
             }.card()
-            HStack { Spacer(); Button("Done") { close() }.buttonStyle(Pill()).keyboardShortcut(.defaultAction) }
+            HStack { Spacer(); AsciiButton("DONE") { close() }.keyboardShortcut(.defaultAction) }
         }.padding(S.xl).frame(width: 440).background(T.bg)
     }
 }
@@ -404,28 +524,20 @@ struct MainView: View {
         VStack(alignment: .leading, spacing: S.xl) {
             HStack(spacing: S.md) {
                 Logo()
-                Text("Remote Wake").font(ff(24, .bold)).foregroundStyle(T.text)
+                Text("Remote Wake").font(ff(22, .bold)).foregroundStyle(T.text)
                 Spacer()
                 Button("Help") { help = true }.buttonStyle(Quiet())
             }
             if !setupDone {
                 SetupView(m: m) { setupDone = true }
             } else {
-                VStack(alignment: .leading, spacing: S.lg) {
-                    HStack(alignment: .center, spacing: S.lg) {
-                        VStack(alignment: .leading, spacing: S.xs) {
-                            Text(m.heroTitle).font(ff(18, .bold)).foregroundStyle(T.text)
-                            Text(m.heroText).font(ff(14)).foregroundStyle(T.muted).fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer(minLength: S.md)
-                        Toggle("Stay awake on AC", isOn: m.stayAwake).labelsHidden().toggleStyle(.switch).tint(T.accent).disabled(m.busy)
-                    }
-                    Status(word: m.awakeWord.0, color: m.awakeWord.1)
-                }.card(tint: m.running && m.holding)
+                Hero(m: m)
                 VStack(alignment: .leading, spacing: S.md) {
-                    InfoRow(icon: m.onAC ? "powerplug.fill" : "battery.50", label: "Power") { value(m.onAC ? "Plugged in" : "On battery") }
+                    InfoRow(label: "power") { Status(word: m.onAC ? "AC" : "battery", color: m.onAC ? T.accent : T.warn); value(m.onAC ? "plugged in" : "sleeps normally") }
                     Divider().overlay(T.line)
                     TailscaleRow(m: m)
+                    Divider().overlay(T.line)
+                    InfoRow(label: "phone") { phoneStatus(m) }
                 }.card()
                 PhoneCard(m: m)
                 PhoneSessionsCard(m: m)
@@ -456,24 +568,44 @@ struct MenuView: View {
                 Text("Finish setting up in the app.").font(ff(14)).foregroundStyle(T.muted)
             } else {
                 VStack(alignment: .leading, spacing: S.md) {
-                    InfoRow(icon: "moon.zzz", label: "Stay awake") { Toggle("Stay awake on AC", isOn: m.stayAwake).labelsHidden().toggleStyle(.switch).tint(T.accent).disabled(m.busy) }
+                    InfoRow(label: "Stay awake") { Toggle("Stay awake on AC", isOn: m.stayAwake).labelsHidden().toggleStyle(.switch).tint(T.accent).disabled(m.busy) }
                     Divider().overlay(T.line)
-                    InfoRow(icon: m.onAC ? "powerplug.fill" : "battery.50", label: "Power") { value(m.onAC ? "Plugged in" : "On battery") }
-                    InfoRow(icon: "network", label: "Tailscale") { value(m.tsIP) }
-                    InfoRow(icon: "iphone", label: "Phone") { value(m.phones.first ?? "Not set up") }
+                    InfoRow(label: "Power") { value(m.onAC ? "Plugged in" : "On battery") }
+                    InfoRow(label: "Tailscale") { value(m.tsIP) }
+                    InfoRow(label: "Phone") { value(m.phones.first ?? "Not set up") }
                     if FileManager.default.fileExists(atPath: resRoot + "/tmux/tmux") {
-                        InfoRow(icon: "terminal", label: "Phone sessions") { Toggle("Phone sessions", isOn: Binding(get: { m.phoneOn }, set: { m.phoneSessions($0) })).labelsHidden().toggleStyle(.switch).tint(T.accent).disabled(m.busy) }
+                        InfoRow(label: "Phone sessions") { Toggle("Phone sessions", isOn: Binding(get: { m.phoneOn }, set: { m.phoneSessions($0) })).labelsHidden().toggleStyle(.switch).tint(T.accent).disabled(m.busy) }
                     }
                 }.card()
             }
             if let e = m.error { Text(e).font(ff(13)).foregroundStyle(T.warn) }
             HStack {
-                Button("Open Remote Wake") { NSWorkspace.shared.openApplication(at: mainAppURL, configuration: .init()) }.buttonStyle(Pill(primary: !m.ready || m.tsState != "Running"))
+                AsciiButton("OPEN REMOTE WAKE", primary: !m.ready || m.tsState != "Running") { NSWorkspace.shared.openApplication(at: mainAppURL, configuration: .init()) }
                 Spacer()
                 Button("Quit menu icon") { NSApplication.shared.terminate(nil) }.buttonStyle(Quiet())
             }
         }.padding(S.lg).frame(width: 320).background(T.bg)
     }
+}
+
+// MARK: - Menu bar icon: the logo reduced to solid shapes (chevron, underscore, Z) as a template image, so macOS tints it for light/dark bars.
+// Dimmed when stay-awake is off.
+func menuIcon(on: Bool) -> NSImage {
+    let img = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { r in
+        let sz = r.width, a: CGFloat = on ? 1 : 0.4
+        NSColor.black.withAlphaComponent(a).setFill(); NSColor.black.withAlphaComponent(a).setStroke()
+        let ch = NSBezierPath(); ch.lineWidth = sz * 0.1; ch.lineCapStyle = .round; ch.lineJoinStyle = .round
+        ch.move(to: NSPoint(x: sz * 0.2, y: sz * 0.5)); ch.line(to: NSPoint(x: sz * 0.4, y: sz * 0.35)); ch.line(to: NSPoint(x: sz * 0.2, y: sz * 0.2)); ch.stroke()
+        NSRect(x: sz * 0.48, y: sz * 0.15, width: sz * 0.24, height: sz * 0.08).fill()
+        func glyph(_ t: String, _ size: CGFloat, _ x: CGFloat, topFrac: CGFloat) {
+            let at = NSAttributedString(string: t, attributes: [.font: NSFont.systemFont(ofSize: size, weight: .black), .foregroundColor: NSColor.black.withAlphaComponent(a)])
+            at.draw(at: NSPoint(x: x, y: sz * (1 - topFrac) - at.size().height))
+        }
+        glyph("Z", sz * 0.42, sz * 0.55, topFrac: 0.04); glyph("z", sz * 0.26, sz * 0.36, topFrac: 0.26)
+        return true
+    }
+    img.isTemplate = true
+    return img
 }
 
 // MARK: - App
@@ -494,9 +626,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 struct MenuApp: App {
     @StateObject var m = Model()
-    init() { registerFonts() }
     var body: some Scene {
-        MenuBarExtra("Remote Wake", systemImage: m.running ? "moon.zzz.fill" : "moon.zzz") { MenuView(m: m) }
+        MenuBarExtra { MenuView(m: m).preferredColorScheme(.dark) } label: { Image(nsImage: menuIcon(on: m.running)).accessibilityLabel("Remote Wake") }
             .menuBarExtraStyle(.window)
     }
 }
@@ -504,9 +635,8 @@ struct MenuApp: App {
 struct MainApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject var m = Model()
-    init() { registerFonts() }
     var body: some Scene {
-        Window("Remote Wake", id: "main") { MainView(m: m) }.windowResizability(.contentSize)
+        Window("Remote Wake", id: "main") { MainView(m: m).preferredColorScheme(.dark) }.windowResizability(.contentSize)
     }
 }
 

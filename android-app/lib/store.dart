@@ -10,6 +10,4 @@ class Store {
   static Future<void> setAskedBattery() async => (await SharedPreferences.getInstance()).setBool('askedBattery', true);
   static Future<bool> tutorialSeen() async => (await SharedPreferences.getInstance()).getBool('tutorialSeen') ?? false;
   static Future<void> setTutorialSeen() async => (await SharedPreferences.getInstance()).setBool('tutorialSeen', true);
-  static Future<String> themeMode() async => (await SharedPreferences.getInstance()).getString('themeMode') ?? 'system';
-  static Future<void> setThemeMode(String m) async => (await SharedPreferences.getInstance()).setString('themeMode', m);
 }

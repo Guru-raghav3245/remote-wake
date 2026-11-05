@@ -27,7 +27,7 @@ class KeepAliveService : Service() {
         val n = Notification.Builder(this, "session")
             .setContentTitle("Remote Wake")
             .setContentText(i?.getStringExtra("text") ?: "Terminal session open")
-            .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
+            .setSmallIcon(R.drawable.ic_stat)
             .setContentIntent(tap).setOngoing(true).build()
         if (Build.VERSION.SDK_INT >= 34) startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE) else startForeground(1, n)
         if (wl == null) {
