@@ -1,0 +1,210 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Remote Wake demo</title>
+<style>
+:root{--bg:#0B0B0E;--card:#121217;--soft:#1A1A21;--line:#23232B;--stage:#050507;--text:#E8E8EC;--muted:#8A8A98;--dim:#6B6B78;--ok:#7BE0B0;--warn:#E3B341;--bad:#E5484D;--pink:#FF6AC1;--blue:#6CB6FF}
+*{box-sizing:border-box;margin:0}
+html,body{width:1280px;height:720px;overflow:hidden;background:var(--stage);color:var(--text);font:14px ui-monospace,SFMono-Regular,Menlo,monospace}
+.fx{position:absolute;opacity:0;transition:none}
+#cap{left:0;right:0;bottom:28px;text-align:center;font-size:20px;color:var(--text)}
+#cap b{color:var(--pink);font-weight:400}
+.ok{color:var(--ok)}.pk{color:var(--pink)}.mu{color:var(--muted)}.dm{color:var(--dim)}.bd{color:var(--bad)}.bl{color:var(--blue)}.wn{color:var(--warn)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;margin-right:6px}
+.btn{display:inline-block;border:1px solid var(--ok);color:var(--ok);padding:6px 14px;border-radius:4px;background:rgba(123,224,176,.08);box-shadow:0 0 14px rgba(123,224,176,.35);letter-spacing:1px;font-size:12px}
+.btn.q{border-color:var(--line);color:var(--muted);background:none;box-shadow:none}
+.win{background:var(--bg);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.bar{height:30px;background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 12px;gap:7px}
+.bar i{width:11px;height:11px;border-radius:50%;background:#3a3a44;display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+/* phone */
+#phone{left:150px;top:30px;width:340px;height:640px;border:2px solid #34343e;border-radius:34px;background:var(--bg);overflow:hidden;box-shadow:0 0 0 6px #0f0f13}
+#phone .scr{position:absolute;inset:0;padding:34px 14px 14px}
+#term{position:absolute;inset:50px 0 70px 0;display:flex;flex-direction:column;justify-content:flex-end;padding:0 10px;font-size:11px;line-height:14px;white-space:pre;overflow:hidden}
+.key{display:inline-block;min-width:34px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:6px 4px;margin:2px;font-size:10px;color:var(--muted)}
+.key.on{background:var(--pink);color:#000;border-color:var(--pink)}
+.tk{display:flex;align-items:center;gap:8px;padding:6px 0}
+</style>
+
+<div id="intro" class="fx" data-a="0" data-b="4" style="inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px">
+  <img src="../../site/logo.png" width="128" height="128" style="border-radius:28px">
+  <div style="font-size:44px;font-weight:700;letter-spacing:2px">Remote Wake</div>
+  <div class="mu" style="font-size:18px">Reach your Mac from your phone. Lid closed.</div>
+</div>
+
+<!-- MAC -->
+<div id="dmg" class="fx win" data-a="4.2" data-b="7.2" style="left:380px;top:150px;width:520px;height:300px">
+  <div class="bar"><i></i><i></i><i></i><span class="mu" style="margin-left:10px">Remote Wake</span></div>
+  <div style="position:relative;height:270px">
+    <div style="position:absolute;left:70px;top:70px;text-align:center" id="dmgapp"><img src="../../site/logo.png" width="96" style="border-radius:20px"><div class="mu" style="margin-top:8px">Remote Wake</div></div>
+    <div style="position:absolute;left:210px;top:112px" class="dm">----&gt;</div>
+    <div style="position:absolute;left:340px;top:70px;text-align:center"><div style="width:96px;height:96px;border:1px solid var(--line);border-radius:20px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:36px">A</div><div class="mu" style="margin-top:8px">Applications</div></div>
+  </div>
+</div>
+
+<div id="mac" class="fx win" data-a="7.2" data-b="17.4" style="left:190px;top:110px;width:900px;height:380px">
+  <div class="bar"><i></i><i></i><i></i><span class="mu" style="margin-left:10px">Remote Wake</span></div>
+  <div style="display:flex;gap:20px;padding:20px">
+    <div style="width:540px">
+      <div id="hero" style="font-size:78px;font-weight:900;letter-spacing:6px;line-height:1"></div>
+      <div id="path" class="mu" style="margin:14px 0 18px"></div>
+      <div class="card" id="steps" style="font-size:15px;line-height:2.1"></div>
+    </div>
+    <div style="width:280px" class="card" id="reads"></div>
+  </div>
+</div>
+<div id="pw" class="fx card" data-a="9.3" data-b="10.9" style="left:500px;top:230px;width:280px;border-color:#444;background:#1c1c22">
+  <div style="margin-bottom:10px">Remote Wake wants to install a helper.</div>
+  <div class="mu" style="margin-bottom:10px">Enter your password</div>
+  <div class="card" id="pwf" style="padding:8px;letter-spacing:4px">&nbsp;</div>
+</div>
+<div id="web" class="fx win" data-a="11.3" data-b="12.8" style="left:430px;top:200px;width:420px">
+  <div class="bar"><i></i><i></i><i></i><span class="mu" style="margin-left:10px">login.tailscale.com</span></div>
+  <div style="padding:26px;text-align:center"><div style="font-size:18px;margin-bottom:14px">Sign in to Tailscale</div><div class="btn q" style="color:var(--text);border-color:#555;font-size:14px;padding:10px 26px">Continue with Google</div></div>
+</div>
+
+<!-- PHONE -->
+<div id="phone" class="fx" data-a="17.2" data-b="72.4">
+  <div id="pAPK" class="scr fx" data-a="17.4" data-b="19.6"><div class="card" style="margin-top:150px;background:#1c1c22"><div style="font-size:16px;margin-bottom:6px">Install Remote Wake?</div><div class="mu" style="margin-bottom:16px">RemoteWake.apk · 40 MB</div><div style="text-align:right" class="ok">CANCEL &nbsp; <b id="inst" class="btn">INSTALL</b></div></div></div>
+  <div id="pGuide" class="scr fx" data-a="19.6" data-b="24.2">
+    <div style="font-size:22px;margin:14px 0 14px">Set up</div>
+    <div class="card" id="pst" style="font-size:14px;line-height:2.4"></div>
+    <div id="pweb" class="card fx" data-a="20.4" data-b="21.7" style="position:absolute;left:14px;right:14px;top:200px;background:#1c1c22;text-align:center"><div class="mu" style="margin-bottom:8px">Chrome · login.tailscale.com</div>Sign in with Google<br><span class="ok">Connected</span></div>
+  </div>
+  <div id="pHome" class="scr fx" data-a="24.2" data-b="27.6">
+    <div style="text-align:center;margin-top:36px;white-space:pre;line-height:1.15" class="ok">  ┌──────────────┐
+  │              │
+  │   &gt;_  Z      │
+  │              │
+  └──────────────┘
+  ───────────────────</div>
+    <div style="text-align:center;font-size:24px;font-weight:700;margin:14px 0" class="ok">ONLINE</div>
+    <div class="mu" style="margin-bottom:8px">Your computers</div>
+    <div id="mcard" class="card" style="font-size:15px"><span class="ok"><span class="dot"></span></span>alex-macbook<div class="mu" style="font-size:12px;margin-top:4px">macOS · online</div></div>
+  </div>
+  <div id="pUser" class="scr fx" data-a="27.6" data-b="30.2"><div class="card" style="margin-top:170px;background:#1c1c22"><div style="font-size:16px;margin-bottom:10px">User name on alex-macbook</div><div class="card" style="padding:8px;margin-bottom:14px">alex<span class="pk">▌</span></div><div style="text-align:right"><b class="btn">CONNECT</b></div></div></div>
+  <div id="pTerm" class="scr fx" data-a="30" data-b="72.4" style="padding:0">
+    <div style="position:absolute;left:0;right:0;top:0;height:50px;padding:30px 14px 0;border-bottom:1px solid var(--line)" class="mu"><span class="ok"><span class="dot"></span></span>alex-macbook<span class="dm" style="float:right">⌨</span></div>
+    <div id="term"></div>
+    <div style="position:absolute;left:6px;right:6px;bottom:8px;height:58px">
+      <span class="key">Esc</span><span class="key" id="ktab">Tab</span><span class="key">Ctrl</span><span class="key" style="color:var(--bad)">Stop ^C</span><span class="key">↑</span><span class="key">↓</span><span class="key">|</span><span class="key">/</span><span class="key">~</span>
+    </div>
+  </div>
+</div>
+
+<!-- LAPTOP (right side, scenes terminal + lid) -->
+<div id="lap" class="fx" data-a="30.4" data-b="72.4" style="left:620px;top:120px;width:560px;height:430px">
+  <div id="lid" style="position:absolute;left:60px;top:0;width:440px;height:280px;border:2px solid #3a3a44;border-radius:14px 14px 0 0;background:var(--bg);transform-origin:bottom;overflow:hidden;padding:30px;text-align:center">
+    <img src="../../site/logo.png" width="64" style="border-radius:14px">
+    <div id="lapw" style="font-size:44px;font-weight:900;letter-spacing:4px;margin-top:20px" class="ok">AWAKE</div>
+    <div class="mu" style="margin-top:8px">stay awake on AC is on</div>
+  </div>
+  <div style="position:absolute;left:20px;top:280px;width:520px;height:18px;background:#2a2a32;border-radius:0 0 14px 14px"></div>
+  <div id="lapnote" class="mu" style="position:absolute;left:0;right:0;top:330px;text-align:center;font-size:16px"></div>
+</div>
+
+<div id="outro" class="fx" data-a="73" data-b="80" style="inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+  <img src="../../site/logo.png" width="96" style="border-radius:22px">
+  <div style="font-size:36px;font-weight:700">Remote Wake</div>
+  <div class="ok" style="font-size:22px">remote-wake.vercel.app</div>
+  <div class="mu">Free · Mac + Android · powered by Tailscale</div>
+</div>
+
+<div id="cap" class="fx" style="opacity:1"></div>
+
+<script>
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+// captions: [from,to,html]
+const CAPS=[[4.2,7,'<b>[1]</b> Mac: open the DMG and drag Remote Wake to Applications'],[7.4,10.8,'Setup checklist: install the helper (one password prompt)'],[10.8,13.2,'Sign in to Tailscale in your browser'],[13.2,17.2,'Turn on <b>stay awake on AC</b>: the Mac now keeps running with the lid closed'],[17.4,19.6,'<b>[2]</b> Phone: install RemoteWake.apk'],[19.8,24,'Sign in with the same Tailscale account, allow background running'],[24.4,30,'Tap your Mac. Enter its user name.'],[30.4,36.5,'A real terminal on your Mac: <b>Tab</b> completion works'],[36.8,41,'Your tools, your folders'],[41.5,56,'Claude Code is already signed in (phone sessions share the desktop keychain)'],[57,63,'Start something long running'],[63.5,70,'<b>Close the lid.</b> The session keeps going.'],[70.2,72.4,'Lid open again. Nothing was lost.']];
+// terminal script: [start, kind, text]; kinds: type (cps 14), out, tab (ends a type part), cls
+const P='<span class="ok">alex@mac</span> <span class="bl">~</span> % ';
+const T=[
+[30.0,'out','<span class="mu">Connecting to alex-macbook...</span>'],
+[31.2,'cls'],
+[31.3,'prompt'],
+[31.6,'type','pwd'],[32.4,'enter'],[32.5,'out','/Users/alex'],
+[33.2,'prompt'],[33.4,'type','cd Pro'],[34.1,'tab','jects/'],[34.9,'enter'],
+[35.4,'prompt','<span class="bl">~/Projects</span> % '],[35.6,'type','ls'],[36.2,'enter'],[36.3,'out','notes  remote-wake  website'],
+[37.0,'prompt','<span class="bl">~/Projects</span> % '],[37.2,'type','cd remote-wake'],[38.2,'enter'],
+[38.8,'prompt','<span class="bl">remote-wake</span> % '],[39.0,'type','git status'],[39.8,'enter'],[39.9,'out','On branch main\nnothing to commit, working tree clean'],
+[41.0,'prompt','<span class="bl">remote-wake</span> % '],[41.2,'type','claude'],[41.9,'enter'],
+[42.6,'cls'],[42.6,'out','<span class="pk">✻ Claude Code</span>\n<span class="dm">~/Projects/remote-wake</span>\n'],
+[44.0,'raw','<span class="pk">&gt;</span> '],[44.1,'type','what changed today?'],[45.4,'enter'],
+[46.2,'out','<span class="mu">● Two commits today:</span>'],
+[47.4,'out','  - phone terminal: one text input'],
+[48.4,'out','  - font 11, release 0.3.1'],
+[49.6,'out','  Both are pushed to main.'],
+[56.6,'raw','\n<span class="pk">&gt;</span> '],[56.8,'type','/exit'],[57.3,'enter'],[57.6,'cls'],
+[57.7,'prompt','<span class="bl">remote-wake</span> % '],[57.9,'type','while true; do date +%T; sleep 5; done'],[59.6,'enter']
+];
+for(let k=0;k<7;k++)T.push([60.0+k*2,'out','<span class="ok">'+['10:42:07','10:42:12','10:42:17','10:42:22','10:42:27','10:42:32','10:42:37'][k]+'</span>']);
+function drawTerm(t){
+  let lines=[''],cur='',tab=false,tabAt=-9;
+  const put=h=>{lines[lines.length-1]+=h};
+  const nl=()=>lines.push('');
+  for(let i=0;i<T.length;i++){
+    const [s,k,x]=T[i]; if(s>t)break;
+    if(k==='cls'){lines=[''];}
+    else if(k==='prompt'){ if(lines[lines.length-1])nl(); put(x||P);}
+    else if(k==='raw'){put(x);}
+    else if(k==='type'){const n=Math.min(x.length,Math.floor((t-s)*14));put(esc(x.slice(0,n)));if(n<x.length)put('<span class="pk">▌</span>');}
+    else if(k==='tab'){tabAt=s;put(esc(x));}
+    else if(k==='enter'){nl();}
+    else if(k==='out'){put(x.replace(/\n/g,'\u0001'));nl();}
+  }
+  const last=lines.length-1;
+  if(!lines[last].includes('▌'))lines[last]+='<span class="pk">▌</span>';
+  document.getElementById('term').innerHTML='<div>'+lines.join('\n').replace(/\u0001/g,'\n').slice(-3000)+'</div>';
+  document.getElementById('ktab').className='key'+(t-tabAt>=0&&t-tabAt<.4?' on':'');
+}
+function steps(t){
+  const m=[[9.3,'Install the helper','INSTALL'],[11.0,'Connect Tailscale','CONNECT TAILSCALE'],[13.4,'Stay awake on AC','TURN ON']];
+  const done=[10.9,12.8,14.4];
+  let h='';
+  m.forEach((s,i)=>{
+    const d=t>=done[i],cur=!d&&(i===0||t>=done[i-1]-0.01);
+    h+=(d?'<span class="ok">[x]</span>':cur?'<span class="pk">[&gt;]</span>':'<span class="dm">[ ]</span>')+' '+s[1]+(cur?'  <span class="btn">'+s[2]+'</span>':'')+'<br>';
+  });
+  document.getElementById('steps').innerHTML=h;
+  const awake=t>=14.4;
+  document.getElementById('hero').innerHTML=awake?'<span class="ok" style="text-shadow:0 0 22px rgba(123,224,176,.5)">AWAKE</span>':'<span class="bd" style="text-shadow:0 0 22px rgba(229,72,77,.5)">ASLEEP</span>';
+  document.getElementById('path').innerHTML=awake?'[phone] <span class="ok">---o---</span> [mac awake]':'[phone] <span class="dm">- - x - -</span> [mac asleep]';
+  const pw='••••••••'.slice(0,clamp((t-9.5)/1.0,0,1)*8|0);
+  document.getElementById('pwf').innerHTML=pw||'&nbsp;';
+  document.getElementById('reads').innerHTML=
+   '<div class="mu">POWER</div><div style="margin:4px 0 16px"><span class="ok"><span class="dot"></span></span>on AC</div>'+
+   '<div class="mu">TAILSCALE</div><div style="margin:4px 0 16px">'+(t>=12.8?'<span class="ok"><span class="dot"></span></span>connected':t>=10.9?'<span class="wn"><span class="dot"></span></span>sign in':'<span class="dm"><span class="dot"></span></span>not installed')+'</div>'+
+   '<div class="mu">PHONE</div><div style="margin:4px 0 16px">'+(t>=26?'<span class="ok"><span class="dot"></span></span>alex-phone':'<span class="dm"><span class="dot"></span></span>none yet')+'</div>'+
+   '<div class="mu">PHONE SESSIONS</div><div style="margin:4px 0"><span class="ok"><span class="dot"></span></span>always on</div>';
+}
+function phoneSteps(t){
+  const d=[21.7,22.9,26.4];
+  const L=['Sign in to Tailscale','Allow background running','Find your Mac'];
+  document.getElementById('pst').innerHTML=L.map((s,i)=>{
+    const done=t>=d[i],cur=!done&&(i===0||t>=d[i-1]);
+    return (done?'<span class="ok">[x]</span>':cur?'<span class="pk">[&gt;]</span>':'<span class="dm">[ ]</span>')+' '+s;
+  }).join('<br>');
+}
+function lid(t){
+  // closed between 63.5 and 69.5, ~1s each way
+  const c=clamp((t-63)/1.2)-clamp((t-69.5)/1.2);
+  const el=document.getElementById('lid');
+  el.style.transform='perspective(900px) rotateX('+(-c*85)+'deg)';
+  el.style.opacity=1-c*.55;
+  document.getElementById('lapnote').innerHTML=c>.9?'<span class="ok">lid closed · still awake · still connected</span>':'';
+}
+function update(t){
+  document.querySelectorAll('[data-a]').forEach(e=>{
+    const a=+e.dataset.a,b=+e.dataset.b;
+    e.style.opacity=clamp((t-a)/.3)*clamp((b-t)/.3);
+  });
+  // dmg drag
+  const dx=clamp((t-5.3)/1.0)*270;
+  document.getElementById('dmgapp').style.transform='translateX('+dx+'px)';
+  steps(t);phoneSteps(t);drawTerm(t);lid(t);
+  const cap=CAPS.find(c=>t>=c[0]&&t<c[1]);
+  const ce=document.getElementById('cap');
+  ce.innerHTML=cap?cap[2]:'';ce.style.opacity=cap?clamp((t-cap[0])/.3)*clamp((cap[1]-t)/.3):0;
+}
+window.update=update;update(0);
+</script>

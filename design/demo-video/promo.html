@@ -1,0 +1,214 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Remote Wake promo</title>
+<style>
+:root{--bg:#0B0B0E;--card:#121217;--line:#23232B;--stage:#050507;--text:#E8E8EC;--muted:#8A8A98;--dim:#6B6B78;--ok:#7BE0B0;--warn:#E3B341;--bad:#E5484D;--pink:#FF6AC1;--blue:#6CB6FF}
+*{box-sizing:border-box;margin:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--stage);color:var(--text);font:16px ui-monospace,SFMono-Regular,Menlo,monospace}
+.fx{position:absolute;opacity:0}
+.ok{color:var(--ok)}.pk{color:var(--pink)}.mu{color:var(--muted)}.dm{color:var(--dim)}.bd{color:var(--bad)}.bl{color:var(--blue)}.wn{color:var(--warn)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;margin-right:6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px}
+#bgd{position:absolute;inset:0;background:radial-gradient(circle at 30% 40%,rgba(123,224,176,.06),transparent 55%),radial-gradient(circle at 80% 70%,rgba(255,106,193,.05),transparent 50%)}
+#hud{position:absolute;left:60px;right:60px;top:34px;display:flex;justify-content:space-between;font-size:15px;color:var(--dim);letter-spacing:1px}
+#rose{position:absolute;left:0;top:0;width:560px;height:1000px;transform-origin:0 0}
+.h{left:120px;top:120px;width:1020px;font-size:76px;font-weight:700;line-height:1.1;letter-spacing:-1px}
+.sub{left:120px;top:330px;width:900px;font-size:28px;line-height:1.5;color:var(--muted)}
+.li{font-size:30px;line-height:1.35;margin-bottom:26px;color:var(--text)}
+.li i{font-style:normal;color:var(--pink);margin-right:14px}
+.li small{display:block;font-size:21px;color:var(--muted);margin-left:56px;margin-top:4px}
+/* phone */
+#phone{left:1180px;top:110px;width:340px;height:640px;border:2px solid #34343e;border-radius:34px;background:var(--bg);overflow:hidden;box-shadow:0 0 0 6px #0f0f13,0 0 80px rgba(123,224,176,.07);transform:scale(1.4);transform-origin:0 0}
+#term{position:absolute;inset:50px 0 70px 0;display:flex;flex-direction:column;justify-content:flex-end;padding:0 10px;font-size:12px;line-height:16px;white-space:pre;overflow:hidden}
+.key{display:inline-block;min-width:34px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:6px 4px;margin:2px;font-size:10px;color:var(--muted)}
+.key.on{background:var(--pink);color:#000;border-color:var(--pink)}
+#ban{position:absolute;left:8px;right:8px;top:56px;padding:8px 10px;border-radius:8px;font-size:11px;background:#2B251C;border:1px solid var(--warn);color:var(--warn)}
+/* laptop */
+#lap{left:120px;top:430px;width:560px;height:430px;transform:scale(1.25);transform-origin:0 0}
+</style>
+<div id="bgd"></div>
+<div id="hud"><span>remote-wake · v0.3.1</span><span id="chap"></span></div>
+<canvas id="rose" width="560" height="1000"></canvas>
+
+<!-- scene text -->
+<div id="h" class="fx h" style="opacity:1"></div>
+<div id="s" class="fx sub" style="opacity:1"></div>
+
+<!-- S1 / S7 title blocks -->
+<div id="t1" class="fx" data-a="0.3" data-b="6.2" style="left:820px;top:330px;width:1000px">
+  <div style="font-size:128px;font-weight:900;letter-spacing:6px;line-height:1" class="ok">REMOTE<br>WAKE</div>
+  <div class="mu" style="font-size:34px;margin-top:34px">Your Mac, from your phone.<br>Lid closed.</div>
+</div>
+<div id="t7" class="fx" data-a="66.5" data-b="76" style="left:820px;top:270px;width:1000px">
+  <img src="../../site/logo.png" width="120" style="border-radius:26px;margin-bottom:26px"><br>
+  <div style="font-size:96px;font-weight:900;letter-spacing:4px;line-height:1" class="ok">REMOTE WAKE</div>
+  <div class="mu" style="font-size:34px;margin:30px 0 44px">Free. Mac + Android. Private by design.</div>
+  <div style="font-size:44px" class="pk">remote-wake.vercel.app</div>
+  <div class="dm" style="font-size:22px;margin-top:22px">open source · powered by Tailscale</div>
+</div>
+
+<!-- laptop -->
+<div id="lap" class="fx" data-a="6.6" data-b="27.2">
+  <div id="lid" style="position:absolute;left:60px;top:0;width:440px;height:280px;border:2px solid #3a3a44;border-radius:14px 14px 0 0;background:var(--bg);transform-origin:bottom;overflow:hidden;padding:30px;text-align:center">
+    <img src="../../site/logo.png" width="64" style="border-radius:14px">
+    <div id="lapw" style="font-size:44px;font-weight:900;letter-spacing:4px;margin-top:20px" class="ok">AWAKE</div>
+    <div id="lapsub" class="mu" style="margin-top:8px"></div>
+  </div>
+  <div style="position:absolute;left:20px;top:280px;width:520px;height:18px;background:#2a2a32;border-radius:0 0 14px 14px"></div>
+  <div id="lapnote" style="position:absolute;left:0;right:0;top:322px;text-align:center;font-size:16px"></div>
+</div>
+
+<!-- phone -->
+<div id="phone" class="fx" data-a="6.6" data-b="56">
+  <div style="position:absolute;left:0;right:0;top:0;height:50px;padding:30px 14px 0;border-bottom:1px solid var(--line)" class="mu"><span class="ok"><span class="dot"></span></span>alex-macbook</div>
+  <div id="term"></div>
+  <div id="ban" class="fx">Connection lost, reconnecting...</div>
+  <div style="position:absolute;left:6px;right:6px;bottom:8px;height:58px">
+    <span class="key">Esc</span><span class="key" id="ktab">Tab</span><span class="key">Ctrl</span><span class="key" style="color:var(--bad)">Stop ^C</span><span class="key">↑</span><span class="key">↓</span><span class="key">|</span><span class="key">/</span><span class="key">~</span>
+  </div>
+</div>
+
+<!-- S6 diagram -->
+<div id="dia" class="fx" data-a="57.4" data-b="66" style="left:120px;top:690px;font-size:26px;white-space:pre;line-height:1.4"></div>
+
+<script>
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+/* ---------- rose (same maths as the website) ---------- */
+const rose=(function(){
+  const cv=document.getElementById('rose'),g=cv.getContext('2d'),W=560,H=1000,CW=6,CH=10,cols=Math.floor(W/CW),rows=Math.floor(H/CH);
+  const RAMP=' .,:;-=+*#%@',PI=Math.PI,NX=70,NT=700,np=(NX+1)*(NT+1);
+  const px=new Float32Array(np),py=new Float32Array(np),pz=new Float32Array(np),nx=new Float32Array(np),ny=new Float32Array(np),nz=new Float32Array(np);
+  for(let i=0;i<=NX;i++)for(let j=0;j<=NT;j++){
+    const x=i/NX,th=-2*PI+j/NT*17*PI,ph=PI/2*Math.exp(-th/(8*PI)),yy=1.95653*x*x*Math.pow(1.27689*x-1,2)*Math.sin(ph);
+    let m=(3.6*th)%(2*PI);if(m<0)m+=2*PI;const r=1-.5*Math.pow(1.25*Math.pow(1-m/PI,2)-.25,2),q=x*Math.sin(ph)+yy*Math.cos(ph),k=i*(NT+1)+j;
+    px[k]=r*q*Math.sin(th);py[k]=r*q*Math.cos(th);pz[k]=r*(x*Math.cos(ph)-yy*Math.sin(ph));
+  }
+  for(let i=0;i<=NX;i++)for(let j=0;j<=NT;j++){
+    const a=i*(NT+1)+j,ia=Math.min(i+1,NX)*(NT+1)+j,ib=Math.max(i-1,0)*(NT+1)+j,ja=i*(NT+1)+Math.min(j+1,NT),jb=i*(NT+1)+Math.max(j-1,0);
+    const ux=px[ia]-px[ib],uy=py[ia]-py[ib],uz=pz[ia]-pz[ib],vx=px[ja]-px[jb],vy=py[ja]-py[jb],vz=pz[ja]-pz[jb];
+    const cx=uy*vz-uz*vy,cy=uz*vx-ux*vz,cz=ux*vy-uy*vx,l=Math.hypot(cx,cy,cz)||1;nx[a]=cx/l;ny[a]=cy/l;nz[a]=cz/l;
+  }
+  const tilt=.5,sc=cols/2.3,pad=Math.round(H*.06/CH),v0=pad+Math.round(sc*CW/CH*1.15+1);
+  let sx,sy,sz,snx,sny,snz,sp=0;
+  (function(len){
+    const X=[],Y=[],Z=[],NXs=[],NYs=[],NZs=[],PI2=2*PI;
+    const at=z=>{const d=-z-.05;return[.32*Math.sin(d*1.1),.06*Math.sin(d*1.9),z]};
+    const add=(p,n)=>{X.push(p[0]);Y.push(p[1]);Z.push(p[2]);const l=Math.hypot(n[0],n[1],n[2])||1;NXs.push(n[0]/l);NYs.push(n[1]/l);NZs.push(n[2]/l)};
+    const rings=Math.ceil(len/.03);
+    for(let i=0;i<rings;i++)for(let j=0;j<8;j++){const a=j/8*PI2,c=at(-.05-i*.03);add([c[0]+.075*Math.cos(a),c[1]+.075*Math.sin(a),c[2]],[Math.cos(a),Math.sin(a),0])}
+    const leaf=(zz,phi,L)=>{const o=at(zz),cp=Math.cos(phi),sn=Math.sin(phi);
+      const P=(s,w)=>{const hw=.27*Math.pow(Math.sin(PI*Math.min(1,Math.max(0,s))),.7)*w;return[o[0]+cp*L*s-sn*hw,o[1]+sn*L*s+cp*hw,o[2]+.3*s-.5*s*s+.06*Math.abs(w)*Math.sin(PI*s)]};
+      for(let a=0;a<=26;a++)for(let b=-8;b<=8;b++){const s=a/26,w=b/8,e=.02,A=P(s+e,w),B=P(s-e,w),C=P(s,w+e),D=P(s,w-e);
+        const u=[A[0]-B[0],A[1]-B[1],A[2]-B[2]],v=[C[0]-D[0],C[1]-D[1],C[2]-D[2]];add(P(s,w),[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]])}};
+    for(let n=0,z=-.6;z>-len+.5;n++,z-=1.5)leaf(z,n%2?PI+.45:.5,n%2?.75:.85);
+    sp=X.length;sx=Float32Array.from(X);sy=Float32Array.from(Y);sz=Float32Array.from(Z);snx=Float32Array.from(NXs);sny=Float32Array.from(NYs);snz=Float32Array.from(NZs);
+  })((rows-Math.round(pad*1.5)-v0)/(sc*CW/CH*Math.cos(tilt)));
+  g.font='600 '+CH+'px ui-monospace,Menlo,monospace';g.textBaseline='top';
+  const buf=new Float32Array(cols*rows),col=new Uint8Array(cols*rows),bright=new Float32Array(cols*rows);
+  return function draw(spin){
+    const cs=Math.cos(spin),sn=Math.sin(spin),ct=Math.cos(tilt),st=Math.sin(tilt),u0=cols/2;buf.fill(-9);col.fill(0);bright.fill(0);
+    const put=(x,y,z,Nx,Ny,Nz,kind)=>{
+      const X=x*cs-y*sn,Y=x*sn+y*cs,NX2=Nx*cs-Ny*sn,NY2=Nx*sn+Ny*cs,V=z*ct-Y*st,D=Y*ct+z*st,NV=Nz*ct-NY2*st,ND=NY2*ct+Nz*st;
+      const cx=Math.floor(u0+X*sc),cy=Math.floor(v0-V*sc*CW/CH);if(cx<0||cx>=cols||cy<0||cy>=rows)return;const k=cy*cols+cx;if(D<=buf[k])return;buf[k]=D;
+      const lit=Math.abs(NX2*-.35+NV*.6+ND*.7),v=.1+.9*Math.pow(lit,1.2)*(.6+.4*clamp((D+1.1)/2.2));
+      bright[k]=kind===2?.35+.65*Math.pow(lit,.8):Math.pow(clamp((v-.3)/.6),1.3);col[k]=kind;};
+    for(let k=0;k<np;k++)put(px[k],py[k],pz[k],nx[k],ny[k],nz[k],1);
+    for(let k=0;k<sp;k++)put(sx[k],sy[k],sz[k],snx[k],sny[k],snz[k],2);
+    g.clearRect(0,0,W,H);const oy=(H-rows*CH)/2,ox=(W-cols*CW)/2;
+    for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const k=r*cols+c;if(buf[k]<=-9)continue;const b=bright[k],ch=RAMP[Math.min(RAMP.length-1,Math.floor(b*RAMP.length))];if(ch===' ')continue;
+      g.fillStyle=col[k]===2?'rgba(123,224,176,'+(.55+Math.min(1,b+.35)*.45)+')':'rgba('+Math.round(190+65*b)+','+Math.round(40+90*b*b)+','+Math.round(60+90*b*b)+','+(.45+b*.55)+')';
+      g.fillText(ch,ox+c*CW,oy+r*CH);}
+  };
+})();
+/* rose placement over time: [from,to,x,scale,peakOpacity] fade in/out inside each window */
+const ROSE=[[0,6.4,140,1,1],[14.2,16,560,1,.5],[41.2,43,560,1,.5],[56,66.6,1250,1,1],[66.4,76,140,1,1]];
+function roseState(t){let best=null;for(const [a,b,x,s,o] of ROSE){if(t>=a&&t<=b){const op=o*clamp((t-a)/.8)*clamp((b-t)/.8);if(!best||op>best.op)best={x,s,op}}}return best||{x:0,s:1,op:0}}
+
+/* ---------- scenes ---------- */
+const S=[ // [from,to,chapter,headline,sub-html]
+[6.6,14.6,'00 / the problem','Close the lid.',null],
+[15.4,27,'01 / stays awake','It stays awake.',[['Works with the lid closed','on AC power, one switch'],['Display off, screen locked','still reachable'],['Lives in the menu bar','install once, forget it']]],
+[27.6,41.4,'02 / real terminal','A real terminal.',[['Tab completion','cd + Tab, just like at your desk'],['Esc, Ctrl and arrows','one tap away'],['Drops reconnect','by themselves']]],
+[42.4,55.6,'03 / claude code','Claude Code, in your pocket.',[['Already signed in','phone sessions share your Mac keychain'],['Programs survive a drop','they run in a shared session'],['Any command line tool','not only Claude']]],
+[56.4,66,'04 / private + free','Private. Free.',[['Encrypted end to end','over Tailscale, WireGuard under the hood'],['No cloud of ours','no account with us, nothing to host'],['Open source','free for personal use']]]];
+function typed(html,n){let out='',vis=0,i=0,open=0;while(i<html.length){if(html[i]==='<'){const j=html.indexOf('>',i);out+=html.slice(i,j+1);i=j+1;continue}if(vis>=n)break;out+=html[i];i++;vis++}return out}
+function scenes(t){
+  const h=document.getElementById('h'),s=document.getElementById('s'),chap=document.getElementById('chap');
+  const sc=S.find(x=>t>=x[0]&&t<x[1]);
+  if(!sc){h.innerHTML='';s.innerHTML='';chap.textContent='';return}
+  const [a,b,c,hl,list]=sc,ph=clamp(Math.min((t-a)/.4,(b-t)/.4));
+  h.style.opacity=ph;s.style.opacity=ph;chap.textContent=c;
+  const n=Math.floor((t-a)*28);
+  let H=esc(hl),cur=n<hl.length?'<span class="pk">▌</span>':'';
+  h.innerHTML=typed(H,n)+cur;
+  if(a===6.6){ // problem scene: second line
+    const bad=t>10.4;h.innerHTML=typed(H,n)+(n>=hl.length?'<br><span class="'+(bad?'bd':'mu')+'">'+(bad?'Your Mac sleeps.<br>Your session dies.':'')+'</span>':'')+(n<hl.length?cur:'');
+  }
+  if(list)s.innerHTML=list.map((it,i)=>{const on=clamp((t-(a+1.4+i*1.5))/.4);return '<div class="li" style="opacity:'+on+';transform:translateX('+((1-on)*24)+'px)"><i>[&gt;]</i>'+esc(it[0])+'<small>'+esc(it[1])+'</small></div>'}).join('');
+  else s.innerHTML='';
+}
+
+/* ---------- terminal script (absolute seconds) ---------- */
+const PA='<span class="ok">mac</span> <span class="bl">~</span> % ',PR='<span class="bl">Projects</span> % ',PW='<span class="bl">remote-wake</span> % ';
+const LOOP='while :; do date +%T; sleep 5; done';
+const T=[
+ // S2: a session that dies when the Mac sleeps
+ [6.6,'cls'],[6.8,'prompt',PA],[7.0,'type',LOOP],[8.0,'enter'],
+ [8.4,'out','<span class="ok">10:41:55</span>'],[9.4,'out','<span class="ok">10:42:00</span>'],
+ // S3: same thing, Mac stays awake, lid closes in the middle
+ [15.4,'cls'],[15.6,'prompt',PA],[15.8,'type',LOOP],[16.8,'enter']];
+for(let k=0;k<11;k++)T.push([17.2+k*0.95,'out','<span class="ok">10:5'+(k%6)+':'+String(10+k*5).padStart(2,'0').slice(-2)+'</span>']);
+T.push(
+ [27.6,'cls'],[27.8,'prompt',PA],[28.0,'type','pwd'],[28.6,'enter'],[28.7,'out','/Users/alex'],
+ [29.3,'prompt',PA],[29.5,'type','cd Pro'],[30.3,'tab','jects/'],[31.1,'enter'],
+ [31.6,'prompt',PR],[31.8,'type','ls'],[32.3,'enter'],[32.4,'out','notes  remote-wake  website'],
+ [33.0,'prompt',PR],[33.2,'type','cd remote-wake'],[34.2,'enter'],
+ [34.7,'prompt',PW],[34.9,'type','git status'],[35.7,'enter'],[35.8,'out','On branch main\nnothing to commit, working tree clean'],
+ [38.6,'prompt',PW],[38.9,'type','npm run build'],[39.9,'enter'],[40.1,'out','<span class="mu">building...</span>'],
+ [42.4,'cls'],[42.6,'prompt',PW],[42.8,'type','claude'],[43.5,'enter'],
+ [44.2,'cls'],[44.2,'out','<span class="pk">✻ Claude Code</span>\n<span class="dm">~/Projects/remote-wake</span>\n'],
+ [45.4,'raw','<span class="pk">&gt;</span> '],[45.5,'type','what changed today?'],[46.8,'enter'],
+ [47.6,'out','<span class="mu">● Two commits today:</span>'],[48.6,'out','  - phone terminal: one text input'],[49.5,'out','  - font 11, release 0.3.1'],[50.5,'out','  Both are pushed to main.'],
+ [52.0,'raw','\n<span class="pk">&gt;</span> '],[52.2,'type','run the tests'],[53.2,'enter'],[53.8,'out','<span class="mu">● 24 passed</span>']);
+function drawTerm(t){
+  let lines=[''],tabAt=-9;
+  const put=h=>{lines[lines.length-1]+=h},nl=()=>lines.push('');
+  for(const [s,k,x] of T){if(s>t)break;
+    if(k==='cls')lines=[''];
+    else if(k==='prompt'){if(lines[lines.length-1])nl();put(x)}
+    else if(k==='raw')put(x);
+    else if(k==='type'){const n=Math.min(x.length,Math.floor((t-s)*14));put(esc(x.slice(0,n)));if(n<x.length)put('<span class="pk">▌</span>')}
+    else if(k==='tab'){tabAt=s;put(esc(x))}
+    else if(k==='enter')nl();
+    else if(k==='out'){put(x);nl()}}
+  if(!lines[lines.length-1].includes('▌'))lines[lines.length-1]+='<span class="pk">▌</span>';
+  document.getElementById('term').innerHTML='<div>'+lines.join('\n').slice(-3500)+'</div>';
+  document.getElementById('ktab').className='key'+(t-tabAt>=0&&t-tabAt<.4?' on':'');
+  // banner: S2 (mac slept) and S4 (a network drop)
+  const lost=(t>11.4&&t<14.6)||(t>40.4&&t<41.6);
+  const ban=document.getElementById('ban');ban.style.opacity=lost?1:0;
+}
+function laptop(t){
+  const sleeping=t>=10.4&&t<15; // S2: lid closed -> mac sleeps
+  let c;
+  if(t<15){c=clamp((t-9)/1.2)}else{c=clamp((t-20)/1.2)-clamp((t-25)/1.2)}
+  const el=document.getElementById('lid');el.style.transform='perspective(900px) rotateX('+(-c*85)+'deg)';el.style.opacity=1-c*.55;
+  const w=document.getElementById('lapw'),sub=document.getElementById('lapsub'),note=document.getElementById('lapnote');
+  if(sleeping||(t>=9&&t<15&&c>0)){w.textContent='ASLEEP';w.className='bd';sub.textContent='sleeping, no connection';note.innerHTML=c>.9?'<span class="bd">lid closed · asleep · phone cannot reach it</span>':''}
+  else{w.textContent='AWAKE';w.className='ok';sub.textContent='stay awake on AC is on';note.innerHTML=c>.9?'<span class="ok">lid closed · still awake · still connected</span>':''}
+}
+function diagram(t){
+  const w=34,p=Math.floor(((t*6)%w)),line=Array.from({length:w},(_,i)=>i===p?'<span class="pk">o</span>':'<span class="ok">-</span>').join('');
+  document.getElementById('dia').innerHTML='<span class="mu">[</span>phone<span class="mu">]</span> '+line+' <span class="mu">[</span>mac<span class="mu">]</span>\n<span class="dm">          encrypted, device to device</span>';
+}
+function update(t){
+  document.querySelectorAll('[data-a]').forEach(e=>{const a=+e.dataset.a,b=+e.dataset.b;e.style.opacity=clamp((t-a)/.4)*clamp((b-t)/.4)});
+  const r=roseState(t),rc=document.getElementById('rose');rc.style.opacity=r.op;rc.style.left=r.x+'px';rc.style.top='40px';rc.style.transform='scale('+r.s+')';
+  if(r.op>0.01)rose(t*.9+.3);
+  const fl=(t>14.2&&t<16)?clamp(r.op*2):0;document.getElementById('lap').style.opacity*=1-fl;
+  scenes(t);drawTerm(t);laptop(t);diagram(t);
+}
+window.update=update;update(0);
+</script>
