@@ -38,15 +38,14 @@ let zshrc = NSHomeDirectory() + "/.zshrc"
 let zMark = ("# >>> Remote Wake phone sessions >>>", "# <<< Remote Wake phone sessions <<<")
 let zBlock = """
 \(zMark.0)
-# Phone logins (SSH) join a tmux session in your desktop login, so saved logins (Keychain) work. Turn off in Remote Wake or delete this block.
+# Phone logins (SSH) join a tmux session in your desktop login, so saved logins (Keychain) work. Remote Wake keeps this on; if you delete the block it is added back the next time the app starts.
 _rw="$HOME/Library/Application Support/Remote Wake/tmux"
 if [[ -n $SSH_CONNECTION && -z $TMUX && -x $_rw ]] && "$_rw" -L \(tmuxSock) has-session -t phone 2>/dev/null; then "$_rw" -L \(tmuxSock) attach -t phone && exit; fi
 unset _rw
 \(zMark.1)
 """
 let tmuxConf = """
-set -g status-left "[#S] "
-set -g status-right ""
+set -g status off
 set -g history-limit 20000
 set -g default-terminal "screen-256color"
 set -sg escape-time 10
@@ -63,6 +62,21 @@ func startTmux() {
     p.standardInput = FileHandle.nullDevice; p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
     guard (try? p.run()) != nil else { return }
     for _ in 0..<30 { usleep(100_000); if tmux(["new-session", "-d", "-s", "phone", "-c", NSHomeDirectory()]) == 0 { return } }   // wait for the socket
+}
+// Phone sessions are always on (the main point of the product): set up whenever the .zshrc block or the tmux copy is missing.
+// A file lock keeps the app and the menu helper from doing it at the same time.
+func ensurePhone() {
+    guard FileManager.default.fileExists(atPath: resRoot + "/tmux/tmux") else { return }
+    try? FileManager.default.createDirectory(atPath: phoneDir, withIntermediateDirectories: true)
+    let fd = open(phoneDir + "/.setup.lock", O_CREAT | O_RDWR, 0o600)
+    guard fd >= 0 else { return }
+    defer { close(fd) }
+    guard flock(fd, LOCK_EX | LOCK_NB) == 0 else { return }
+    if !phoneEnabled() || !FileManager.default.isExecutableFile(atPath: tmuxBin) { setPhone(true) }
+    else if (try? String(contentsOfFile: phoneDir + "/tmux.conf", encoding: .utf8)) != tmuxConf {   // config changed in an update: apply it to the running server too
+        try? tmuxConf.write(toFile: phoneDir + "/tmux.conf", atomically: true, encoding: .utf8)
+        _ = tmux(["source-file", phoneDir + "/tmux.conf"])
+    }
 }
 func setPhone(_ on: Bool) {
     let fm = FileManager.default
@@ -91,6 +105,24 @@ func permStatus() -> [String: Bool] {
 }
 let permText = "Programs you run from your phone may need to read your files (Desktop, Documents, Downloads...), and macOS only asks on this Mac's screen. Allow it now: switch on \"Remote Wake Menu\" in the Full Disk Access list that opens."
 
+// macOS applies Full Disk Access only to processes started after the switch was turned on, and it is the HELPER that needs it (it owns the tmux server).
+// So: restart the helper at launch while the permission is still missing, and again when the app comes to the front after the user clicked Allow access.
+let helperID = "com.guru.remotewake.menu.helper"
+var grantClickedAt: Date?
+func restartHelper() {
+    NSRunningApplication.runningApplications(withBundleIdentifier: helperID).forEach { $0.terminate() }
+    DispatchQueue.global().async {
+        for i in 0..<40 {
+            let left = NSRunningApplication.runningApplications(withBundleIdentifier: helperID)
+            if left.isEmpty { break }
+            if i == 20 { left.forEach { $0.forceTerminate() } }
+            usleep(100_000)
+        }
+        DispatchQueue.main.async { NSWorkspace.shared.openApplication(at: mainAppURL.appendingPathComponent("Contents/Library/LoginItems/Remote Wake Menu.app"), configuration: .init()) }
+    }
+}
+func diskAccessKnown() -> Bool { (((try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: permFile)))) as? [String: Bool]) ?? [:])["disk"] == true }
+
 func tsPath() -> String? { ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tailscale"].first { FileManager.default.isExecutableFile(atPath: $0) } }
 
 struct LogLine: Identifiable { let id: Int; let t: Date; let tag: String; let msg: String; let color: Color }
@@ -113,6 +145,7 @@ struct LogLine: Identifiable { let id: Int; let t: Date; let tag: String; let ms
     var logN = 0
     var timer: Timer?
     var tmuxStarting = false
+    var phoneTried: Date?   // setup is attempted at most every 5 minutes: setPhone restarts the tmux server, so it must not loop if .zshrc cannot be written
 
     func note(_ tag: String, _ msg: String, _ color: Color = T.accent) {
         logN += 1; log.append(LogLine(id: logN, t: Date(), tag: tag, msg: msg, color: color)); if log.count > 50 { log.removeFirst() }
@@ -142,9 +175,19 @@ struct LogLine: Identifiable { let id: Int; let t: Date; let tag: String; let ms
         running = run("/bin/launchctl", ["print", "system/\(label)"]).status == 0
         onAC = run("/usr/bin/pmset", ["-g", "batt"]).out.contains("AC Power")
         holding = run("/usr/bin/pmset", ["-g", "assertions"]).out.range(of: #"PreventSystemSleep\s+1"#, options: .regularExpression) != nil
-        if isHelper { try? FileManager.default.createDirectory(atPath: phoneDir, withIntermediateDirectories: true); try? JSONSerialization.data(withJSONObject: permStatus()).write(to: URL(fileURLWithPath: permFile)) }
+        if isHelper {
+            try? FileManager.default.createDirectory(atPath: phoneDir, withIntermediateDirectories: true)
+            let was = ((try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: permFile)))) as? [String: Bool])?["disk"], now = permStatus()
+            try? JSONSerialization.data(withJSONObject: now).write(to: URL(fileURLWithPath: permFile))
+            // the tmux server was started before the grant, so programs run from the phone would still be denied: start a new one (the next refresh does)
+            if was == false && now["disk"] == true { _ = tmux(["kill-server"]); note("access", "Full Disk Access is on · phone session restarted so it can read your files") }
+        }
         perms = (try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: permFile)))) as? [String: Bool] ?? [:]
         phoneOn = phoneEnabled(); tmuxRunning = phoneOn && tmuxUp()
+        if phoneTried == nil || (!phoneOn && Date().timeIntervalSince(phoneTried!) > 300) {
+            phoneTried = Date()
+            Task.detached { ensurePhone(); await MainActor.run { self.refresh() } }
+        }
         if isHelper && phoneOn && !tmuxRunning && !tmuxStarting { tmuxStarting = true; Task.detached { startTmux(); await MainActor.run { self.tmuxStarting = false } } }   // at login, or if it died
         let hasDaemon = ["/usr/local/bin/tailscaled", "/opt/homebrew/bin/tailscaled"].contains { FileManager.default.isExecutableFile(atPath: $0) }
         guard let ts = tsPath(), hasDaemon else { tsState = "not installed"; tsIP = ""; authURL = nil; return }
@@ -169,11 +212,6 @@ struct LogLine: Identifiable { let id: Int; let t: Date; let tag: String; let ms
             let done = ok
             await MainActor.run { self.busy = false; self.error = done ? nil : "Toggle cancelled or failed"; if !done { self.note("daemon", "toggle cancelled or failed", T.danger) }; self.refresh() }
         }
-    }
-
-    func phoneSessions(_ on: Bool) {
-        busy = true; note("you", on ? "turning phone sessions on…" : "turning phone sessions off…", T.pink)
-        Task.detached { setPhone(on); await MainActor.run { self.busy = false; self.refresh() } }
     }
 
     func connect() {
@@ -273,9 +311,9 @@ func value(_ s: String) -> some View { Text(s).font(ff(13)).foregroundStyle(T.te
 // ASCII word: the text is rasterised into a character grid, then each filled cell is drawn as a character whose density follows a light sweeping across.
 struct WordGrid { let cols: Int, rows: Int, a: [UInt8] }
 func makeWord(_ word: String, cols: Int, rows: Int) -> WordGrid {
-    let chars = Array(word), gap: CGFloat = 2, xs: CGFloat = 1.84   // cells are 10.5 tall by 5.7 wide: draw letters wider so they look natural on screen
-    func font(_ s: CGFloat) -> NSFont { NSFont.systemFont(ofSize: s, weight: .black) }
-    func widths(_ s: CGFloat) -> [CGFloat] { chars.map { NSAttributedString(string: String($0), attributes: [.font: font(s)]).size().width * xs } }
+    let chars = Array(word), gap: CGFloat = 2, xs: CGFloat = 1.23   // cells are 7 tall by 5.7 wide: draw letters wider so they look natural on screen
+    func font(_ s: CGFloat, _ c: Character = "A") -> NSFont { NSFont.systemFont(ofSize: s, weight: c == "S" ? .heavy : .black) }   // S one step lighter: at .black its two curves close up into a blob
+    func widths(_ s: CGFloat) -> [CGFloat] { chars.map { NSAttributedString(string: String($0), attributes: [.font: font(s, $0)]).size().width * xs } }
     var fs = CGFloat(rows) * 1.25, ws = widths(fs)
     func total() -> CGFloat { ws.reduce(0, +) + gap * CGFloat(chars.count - 1) }
     while total() > CGFloat(cols) * 0.92 { fs -= 2; ws = widths(fs) }
@@ -288,7 +326,7 @@ func makeWord(_ word: String, cols: Int, rows: Int) -> WordGrid {
         var x = (CGFloat(cols) - total()) / 2
         for (i, c) in chars.enumerated() {
             ctx.saveGState(); ctx.translateBy(x: x, y: 0); ctx.scaleBy(x: xs, y: 1)
-            NSAttributedString(string: String(c), attributes: [.font: f, .foregroundColor: NSColor.white]).draw(at: NSPoint(x: 0, y: y))
+            NSAttributedString(string: String(c), attributes: [.font: font(fs, c), .foregroundColor: NSColor.white]).draw(at: NSPoint(x: 0, y: y))
             ctx.restoreGState()
             spans.append((c, x, ws[i])); x += ws[i] + gap
         }
@@ -302,11 +340,11 @@ func makeWord(_ word: String, cols: Int, rows: Int) -> WordGrid {
     return WordGrid(cols: cols, rows: rows, a: data)
 }
 @MainActor var wordCache: [String: WordGrid] = [:]
-@MainActor func word(_ w: String) -> WordGrid { if let g = wordCache[w] { return g }; let g = makeWord(w, cols: 94, rows: 9); wordCache[w] = g; return g }
+@MainActor func word(_ w: String) -> WordGrid { if let g = wordCache[w] { return g }; let g = makeWord(w, cols: 88, rows: 12); wordCache[w] = g; return g }   // 12 rows: with fewer, the three bars of E and the curves of S merged into blocks
 
 struct AsciiWord: View {
     let grid: WordGrid, color: Color
-    static let cw: CGFloat = 5.7, ch: CGFloat = 10.5
+    static let cw: CGFloat = 5.7, ch: CGFloat = 7
     var body: some View {
         let live = !reduceMotion
         TimelineView(.animation(minimumInterval: 1.0 / 15, paused: !live)) { tl in
@@ -336,7 +374,7 @@ struct AsciiWord: View {
                 } }
             }
         }
-          .frame(height: 124).frame(maxWidth: .infinity).background(T.stage, in: RoundedRectangle(cornerRadius: 10))
+          .frame(height: 120).frame(maxWidth: .infinity).background(T.stage, in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(T.line, lineWidth: 1))
         .accessibilityLabel("Status")
     }
@@ -370,6 +408,7 @@ extension Model {
     var permsOK: Bool { !needsPerms || (!perms.isEmpty && !perms.values.contains(false)) }
     var permsMissing: String { permNames.filter { perms[$0.key] != true }.map { $0.value }.sorted().joined(separator: ", ") }
     func grantAccess() {
+        grantClickedAt = Date()
         note("you", "opened Full Disk Access settings", T.pink)
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
     }
@@ -470,40 +509,41 @@ struct Hero: View {
     }
 }
 
-// Four readouts side by side (as in the demo): power, tailscale, phone, phone sessions.
+// Readouts stacked in the right column: power, tailscale, phone, phone sessions.
 struct Cell<C: View>: View {
     let label: String
     @ViewBuilder var content: C
-    var body: some View { VStack(alignment: .leading, spacing: S.sm) { Text(label).font(ff(11)).foregroundStyle(T.muted); content }.padding(S.md).frame(maxWidth: .infinity, alignment: .leading) }
+    var body: some View { VStack(alignment: .leading, spacing: S.xs) { Text(label).font(ff(11)).foregroundStyle(T.muted); content }.padding(S.md).frame(maxWidth: .infinity, alignment: .leading) }
 }
 func small(_ s: String) -> some View { Text(s).font(ff(12)).foregroundStyle(T.text).lineLimit(1).truncationMode(.tail) }
 struct Readouts: View {
     @ObservedObject var m: Model
     var hasTmux: Bool { FileManager.default.fileExists(atPath: resRoot + "/tmux/tmux") }
+    var line: some View { Rectangle().fill(T.line).frame(height: 1) }
     var body: some View {
         let ph = m.phones.first, phOn = ph != nil && !(ph!.hasSuffix("(offline)"))
-        HStack(alignment: .top, spacing: 0) {   // fixedSize below: the dividers must not stretch the row
-            Cell(label: "power") { Status(word: m.onAC ? "AC" : "battery", color: m.onAC ? T.accent : T.warn); small(m.onAC ? "plugged in" : "sleeps normally") }
-            Rectangle().fill(T.line).frame(width: 1)
+        VStack(alignment: .leading, spacing: 0) {
+            Cell(label: "power") { HStack(spacing: S.sm) { Status(word: m.onAC ? "AC" : "battery", color: m.onAC ? T.accent : T.warn); small(m.onAC ? "plugged in" : "sleeps normally") } }
+            line
             Cell(label: "tailscale") {
-                if m.tsState == "Running" { Status(word: "running", color: T.accent); small(m.tsIP) }
+                if m.tsState == "Running" { HStack(spacing: S.sm) { Status(word: "running", color: T.accent); small(m.tsIP) } }
                 else if m.tsState == "NeedsLogin", let u = m.authURL, let url = URL(string: u) { Button("Sign in →") { NSWorkspace.shared.open(url) }.buttonStyle(Quiet()) }
                 else { Button("Connect →") { m.connect() }.buttonStyle(Quiet()) }
             }
-            Rectangle().fill(T.line).frame(width: 1)
+            line
             Cell(label: "phone") {
-                Status(word: ph == nil ? "none" : (phOn ? "online" : "offline"), color: ph == nil ? T.muted : (phOn ? T.accent : T.danger))
-                small(ph?.replacingOccurrences(of: " (offline)", with: "") ?? "not set up")
+                HStack(spacing: S.sm) {
+                    Status(word: ph == nil ? "none" : (phOn ? "online" : "offline"), color: ph == nil ? T.muted : (phOn ? T.accent : T.danger))
+                    small(ph?.replacingOccurrences(of: " (offline)", with: "") ?? "not set up")
+                }
             }
             if hasTmux {
-                Rectangle().fill(T.line).frame(width: 1)
+                line
                 Cell(label: "phone sessions") {
-                    Toggle("Phone sessions", isOn: Binding(get: { m.phoneOn }, set: { m.phoneSessions($0) })).labelsHidden().toggleStyle(.switch).tint(T.accent).disabled(m.busy)
-                    if m.phoneOn { Status(word: m.tmuxRunning ? "ready" : "starting", color: m.tmuxRunning ? T.accent : T.warn) } else { small("off") }
+                    HStack(spacing: S.sm) { Status(word: m.phoneOn && m.tmuxRunning ? "ready" : "starting", color: m.phoneOn && m.tmuxRunning ? T.accent : T.warn); small("always on") }
                 }
             }
         }
-        .fixedSize(horizontal: false, vertical: true)
         .background(T.card, in: RoundedRectangle(cornerRadius: 14)).overlay(RoundedRectangle(cornerRadius: 14).stroke(T.line, lineWidth: 1))
     }
 }
@@ -569,9 +609,9 @@ struct PermsCard: View {
 struct HelpSheet: View {
     var close: () -> Void
     let tips = [("clock.arrow.circlepath", "About every 12 hours Tailscale asks your phone to approve a connection in the browser. The phone app shows an Approve button."),
-                ("arrow.triangle.2.circlepath", "If the connection drops, the phone reconnects. With Phone sessions on, your programs keep running and you land back in the same session."),
+                ("arrow.triangle.2.circlepath", "If the connection drops, the phone reconnects. Phone sessions are always on, so your programs keep running and you land back in the same session."),
                 ("lock.shield", "After a power cut with FileVault on, this Mac waits for its password at startup and cannot be reached until someone unlocks it."),
-                ("terminal", "Phone sessions: phone terminals share a session with your desktop login, so Claude Code, git and other tools stay signed in, and programs keep running if the phone drops. Turning it on adds a short block to ~/.zshrc; turning it off removes it. Needs this Mac to be logged in (a locked screen is fine)."),
+                ("terminal", "Phone sessions: phone terminals share a session with your desktop login, so Claude Code, git and other tools stay signed in, and programs keep running if the phone drops. Remote Wake keeps it on: it adds a short, marked block to ~/.zshrc (delete the block and it is added back at the next start). Needs this Mac to be logged in (a locked screen is fine)."),
                 ("menubar.rectangle", "The Remote Wake icon in the menu bar stays when you close this window or quit the app.")]
     var body: some View {
         VStack(alignment: .leading, spacing: S.lg) {
@@ -603,17 +643,17 @@ struct MainView: View {
                 Button("Help") { help = true }.buttonStyle(Quiet())
             }
             if !setupDone {
-                SetupView(m: m) { setupDone = true }
+                SetupView(m: m) { setupDone = true }.frame(maxWidth: 560).frame(maxWidth: .infinity)
             } else {
-                Hero(m: m)
-                Readouts(m: m)
-                PhoneCard(m: m)
-                PermsCard(m: m)
+                HStack(alignment: .top, spacing: S.lg) {
+                    VStack(spacing: S.lg) { Hero(m: m); PhoneCard(m: m); PermsCard(m: m) }.frame(width: 540)
+                    Readouts(m: m).frame(width: 280)
+                }
                 LogView(m: m)
             }
             if let e = m.error { Text(e).font(ff(13)).foregroundStyle(T.warn).padding(S.md).frame(maxWidth: .infinity, alignment: .leading).background(T.warnBg, in: RoundedRectangle(cornerRadius: 8)) }
         }
-        .padding(S.xl).frame(width: 620).background(T.bg)
+        .padding(S.xl).frame(width: 884).background(T.bg)
         .onChange(of: allDone) { if $0 { setupDone = true } }
         .onAppear { if allDone { setupDone = true } }
         .sheet(isPresented: $help) { HelpSheet { help = false } }
@@ -642,7 +682,7 @@ struct MenuView: View {
                     InfoRow(label: "Tailscale") { value(m.tsIP) }
                     InfoRow(label: "Phone") { value(m.phones.first ?? "Not set up") }
                     if FileManager.default.fileExists(atPath: resRoot + "/tmux/tmux") {
-                        InfoRow(label: "Phone sessions") { Toggle("Phone sessions", isOn: Binding(get: { m.phoneOn }, set: { m.phoneSessions($0) })).labelsHidden().toggleStyle(.switch).tint(T.accent).disabled(m.busy) }
+                        InfoRow(label: "Phone sessions") { Status(word: m.phoneOn && m.tmuxRunning ? "ready" : "starting", color: m.phoneOn && m.tmuxRunning ? T.accent : T.warn) }
                     }
                 }.card()
             }
@@ -681,14 +721,19 @@ func menuIcon(on: Bool) -> NSImage {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ n: Notification) {
         guard !isHelper else { return }
-        let id = "com.guru.remotewake.menu.helper"
+        let id = helperID
         try? SMAppService.loginItem(identifier: id).register()
         // register() makes launchd start the helper itself; only start it by hand if nothing runs after a moment
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             if NSRunningApplication.runningApplications(withBundleIdentifier: id).isEmpty {
                 NSWorkspace.shared.openApplication(at: mainAppURL.appendingPathComponent("Contents/Library/LoginItems/Remote Wake Menu.app"), configuration: .init())
-            }
+            } else if !diskAccessKnown() && FileManager.default.fileExists(atPath: resRoot + "/tmux/tmux") { restartHelper() }   // quit and reopen after granting: the old helper still has the old answer
         }
+    }
+    var lastRestart = Date.distantPast
+    func applicationDidBecomeActive(_ n: Notification) {   // back from System Settings after clicking Allow access
+        guard !isHelper, let t = grantClickedAt, Date().timeIntervalSince(t) < 600, !diskAccessKnown(), Date().timeIntervalSince(lastRestart) > 15 else { return }
+        lastRestart = Date(); restartHelper()
     }
 }
 
