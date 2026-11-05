@@ -34,9 +34,7 @@ class _TerminalPageState extends State<TerminalPage> {
   String status = 'connecting...';
   bool ctrl = false;
   bool keysHidden = false; // the three rows of shortcut keys can be folded away to give the terminal more room
-  bool direct = false; // false: type in the command bar; true: the terminal itself takes keystrokes
-  final cmd = TextEditingController();
-  final termFocus = FocusNode(), cmdFocus = FocusNode();
+  final termFocus = FocusNode(); // the terminal itself is the only text input: the keyboard types straight into it
   ReceivePort? rp;
   bool reconnecting = false, gaveUp = false;
   int attempt = 0;
@@ -135,21 +133,8 @@ class _TerminalPageState extends State<TerminalPage> {
     Engine.shellWrite(id, base64.encode(utf8.encode(data)));
   }
 
-  // Text typed in the command bar is sent (without Enter) before a key such as Tab, so `cd ` + Tab completes in the shell.
-  void _flush() { if (cmd.text.isNotEmpty) { _send(cmd.text); cmd.clear(); } }
   void _line(String text) => _send('$text\r');
 
-  void _setDirect(bool v) {
-    setState(() => direct = v);
-    if (v) { cmdFocus.unfocus(); termFocus.requestFocus(); } else { termFocus.unfocus(); cmdFocus.requestFocus(); }
-  }
-
-  void _submit() {
-    final t = cmd.text;
-    cmd.clear();
-    _line(t);
-    cmdFocus.requestFocus();
-  }
 
   // A key in the grid: at least 44 x 44 dp.
   Widget _key(BuildContext c, String label, {String? data, bool on = false, Color? color, VoidCallback? onTap, String? tip, double minW = 44}) {
@@ -163,7 +148,7 @@ class _TerminalPageState extends State<TerminalPage> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: on ? s.accent : s.line)),
           child: InkWell(
             borderRadius: BorderRadius.circular(8),
-            onTap: onTap ?? () { _flush(); _send(data!); },
+            onTap: onTap ?? () => _send(data!),
             child: Container(constraints: BoxConstraints(minWidth: minW, minHeight: 44), alignment: Alignment.center, padding: const EdgeInsets.symmetric(horizontal: Sp.md),
                 child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: on ? s.onAccent : (color ?? s.text)))),
           ),
@@ -215,13 +200,13 @@ class _TerminalPageState extends State<TerminalPage> {
     Native.stop();
     rp?.close();
     if (id > 0) Engine.shellClose(id);
-    cmd.dispose(); termFocus.dispose(); cmdFocus.dispose();
+    termFocus.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext c) {
-    final s = c.sage, tone = _tone(c), live = id > 0;
+    final s = c.sage, tone = _tone(c);
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
@@ -232,9 +217,9 @@ class _TerminalPageState extends State<TerminalPage> {
         actions: [
           StatusWord(tone.$1, tone.$2, key: const Key('tstatus')),
           IconButton(
-            tooltip: direct ? 'Use the command bar' : 'Type directly in the terminal',
-            icon: Icon(direct ? Icons.keyboard_hide_outlined : Icons.keyboard_outlined, color: direct ? s.accent : s.muted),
-            onPressed: () => _setDirect(!direct),
+            tooltip: 'Show or hide the keyboard',
+            icon: Icon(Icons.keyboard_outlined, color: s.muted),
+            onPressed: () => termFocus.hasFocus ? termFocus.unfocus() : termFocus.requestFocus(),
           ),
           const SizedBox(width: Sp.xs),
         ],
@@ -256,10 +241,9 @@ class _TerminalPageState extends State<TerminalPage> {
           Expanded(
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: Sp.sm),
-              decoration: BoxDecoration(color: s.screen, borderRadius: BorderRadius.circular(12), border: Border.all(color: direct ? s.accent.withValues(alpha: .6) : s.line)),
+              decoration: BoxDecoration(color: s.screen, borderRadius: BorderRadius.circular(12), border: Border.all(color: s.line)),
               clipBehavior: Clip.antiAlias,
-              child: TerminalView(term, focusNode: termFocus, readOnly: !direct, theme: _theme, padding: const EdgeInsets.all(Sp.sm), textStyle: const TerminalStyle(fontSize: 13),
-                  onTapUp: (_, _) { if (!direct) _setDirect(true); }),
+              child: TerminalView(term, focusNode: termFocus, theme: _theme, padding: const EdgeInsets.all(Sp.sm), textStyle: const TerminalStyle(fontSize: 11), autofocus: true),
             ),
           ),
           Semantics(
@@ -297,32 +281,7 @@ class _TerminalPageState extends State<TerminalPage> {
               ]),
             ),
           ],
-          if (!direct)
-            Padding(
-              padding: const EdgeInsets.all(Sp.sm),
-              child: Row(children: [
-                Expanded(
-                  child: TextField(
-                    controller: cmd, focusNode: cmdFocus, enabled: live,
-                    autocorrect: false, enableSuggestions: false, textCapitalization: TextCapitalization.none, keyboardType: TextInputType.visiblePassword,
-                    textInputAction: TextInputAction.send, onSubmitted: (_) => _submit(),
-                    style: const TextStyle(fontSize: 14),
-                    decoration: InputDecoration(hintText: live ? 'Type a command, press send' : 'Waiting for the connection...', hintStyle: TextStyle(color: s.muted, fontSize: 13), contentPadding: const EdgeInsets.symmetric(horizontal: Sp.md, vertical: Sp.md)),
-                  ),
-                ),
-                const SizedBox(width: Sp.sm),
-                Semantics(
-                  button: true, label: 'Send command', excludeSemantics: true,
-                  child: Material(
-                    color: live ? s.accent : s.soft,
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(borderRadius: BorderRadius.circular(12), onTap: live ? _submit : null, child: SizedBox(width: 56, height: 48, child: Icon(Icons.keyboard_return, color: live ? s.onAccent : s.muted))),
-                  ),
-                ),
-              ]),
-            )
-          else
-            const SizedBox(height: Sp.sm),
+          const SizedBox(height: Sp.sm),
         ]),
       ),
     );
