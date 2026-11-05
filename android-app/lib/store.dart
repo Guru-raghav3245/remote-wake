@@ -8,6 +8,8 @@ class Store {
   static Future<void> setHostKey(String ip, String fp) async => (await SharedPreferences.getInstance()).setString('fp:$ip', fp);
   static Future<bool> askedBattery() async => (await SharedPreferences.getInstance()).getBool('askedBattery') ?? false;
   static Future<void> setAskedBattery() async => (await SharedPreferences.getInstance()).setBool('askedBattery', true);
+  static Future<bool> keysHidden() async => (await SharedPreferences.getInstance()).getBool('keysHidden') ?? false;
+  static Future<void> setKeysHidden(bool v) async => (await SharedPreferences.getInstance()).setBool('keysHidden', v);
   static Future<bool> tutorialSeen() async => (await SharedPreferences.getInstance()).getBool('tutorialSeen') ?? false;
   static Future<void> setTutorialSeen() async => (await SharedPreferences.getInstance()).setBool('tutorialSeen', true);
 }

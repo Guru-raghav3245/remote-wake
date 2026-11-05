@@ -33,6 +33,7 @@ class _TerminalPageState extends State<TerminalPage> {
   int id = -1;
   String status = 'connecting...';
   bool ctrl = false;
+  bool keysHidden = false; // the three rows of shortcut keys can be folded away to give the terminal more room
   bool direct = false; // false: type in the command bar; true: the terminal itself takes keystrokes
   final cmd = TextEditingController();
   final termFocus = FocusNode(), cmdFocus = FocusNode();
@@ -45,6 +46,7 @@ class _TerminalPageState extends State<TerminalPage> {
   @override
   void initState() {
     super.initState();
+    Store.keysHidden().then((v) { if (mounted) setState(() => keysHidden = v); });
     Native.start('Connected to ${widget.name}');
     term.onOutput = (data) => _send(data);
     term.onResize = (w, h, pw, ph) { if (id > 0) Engine.shellResize(id, w, h); };
@@ -133,6 +135,8 @@ class _TerminalPageState extends State<TerminalPage> {
     Engine.shellWrite(id, base64.encode(utf8.encode(data)));
   }
 
+  // Text typed in the command bar is sent (without Enter) before a key such as Tab, so `cd ` + Tab completes in the shell.
+  void _flush() { if (cmd.text.isNotEmpty) { _send(cmd.text); cmd.clear(); } }
   void _line(String text) => _send('$text\r');
 
   void _setDirect(bool v) {
@@ -159,7 +163,7 @@ class _TerminalPageState extends State<TerminalPage> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: on ? s.accent : s.line)),
           child: InkWell(
             borderRadius: BorderRadius.circular(8),
-            onTap: onTap ?? () => _send(data!),
+            onTap: onTap ?? () { _flush(); _send(data!); },
             child: Container(constraints: BoxConstraints(minWidth: minW, minHeight: 44), alignment: Alignment.center, padding: const EdgeInsets.symmetric(horizontal: Sp.md),
                 child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: on ? s.onAccent : (color ?? s.text)))),
           ),
@@ -258,6 +262,14 @@ class _TerminalPageState extends State<TerminalPage> {
                   onTapUp: (_, _) { if (!direct) _setDirect(true); }),
             ),
           ),
+          Semantics(
+            button: true, label: keysHidden ? 'Show shortcut keys' : 'Hide shortcut keys', excludeSemantics: true,
+            child: InkWell(
+              onTap: () { setState(() => keysHidden = !keysHidden); Store.setKeysHidden(keysHidden); },
+              child: SizedBox(height: 28, child: Center(child: Icon(keysHidden ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: s.muted, size: 22))),
+            ),
+          ),
+          if (!keysHidden) ...[
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.fromLTRB(Sp.sm, Sp.sm, Sp.sm, 0),
@@ -284,6 +296,7 @@ class _TerminalPageState extends State<TerminalPage> {
                       : _key(c, k.$1, data: k.$2),
               ]),
             ),
+          ],
           if (!direct)
             Padding(
               padding: const EdgeInsets.all(Sp.sm),
