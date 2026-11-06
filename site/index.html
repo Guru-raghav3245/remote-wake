@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Remote Wake: reach your Mac from your phone</title>
-<meta name="description" content="Keep your plugged-in Mac awake with the lid closed and open a terminal on it from your Android phone. Free, private, powered by Tailscale.">
+<meta name="description" content="Keep your Mac awake with the lid closed and open a terminal on it from your Android phone. Free, private, powered by Tailscale.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0B0B0E">
 <link rel="icon" href="/favicon.ico" sizes="48x48">
@@ -159,7 +159,7 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
   <header class="hero">
     <div class="eyebrow">REMOTE WAKE / FOR MAC + ANDROID</div>
     <h1>Let your Mac rest.<br>Stay connected.</h1>
-    <p class="lead">Keep your plugged-in Mac awake with the lid closed, and open a terminal on it from your Android phone, from anywhere.</p>
+    <p class="lead">Keep your Mac awake with the lid closed, and open a terminal on it from your Android phone, from anywhere.</p>
     <div class="path" id="path" aria-hidden="true">[phone] ---------o--------- [mac awake]</div>
     <div class="ctas">
       <a class="abtn" data-act href="#download" data-label="DOWNLOAD">[ DOWNLOAD ]</a>
@@ -171,7 +171,7 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
   <section id="how">
     <div class="head"><h2>Three steps, about five minutes</h2><p class="muted">Each app walks you through it and ticks every step off for you.</p></div>
     <div class="grid3">
-      <div class="card"><span class="mark">[x] 1</span><h3>Set up your Mac</h3><p>Install Remote Wake, connect Tailscale (a free account) and turn on "Stay awake on AC". One password prompt.</p></div>
+      <div class="card"><span class="mark">[x] 1</span><h3>Set up your Mac</h3><p>Install Remote Wake, connect Tailscale (a free account) and turn on "Stay awake". One password prompt.</p></div>
       <div class="card"><span class="mark">[>] 2</span><h3>Install the phone app</h3><p>Sideload the Android app and sign in to Tailscale with the same account.</p></div>
       <div class="card"><span class="mark">[ ] 3</span><h3>Tap your Mac</h3><p>Your Mac shows up in the list. Type your user name and you are in a real terminal.</p></div>
     </div>
@@ -203,26 +203,26 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
   <section>
     <div class="head"><h2>Made for leaving your Mac behind</h2></div>
     <div class="grid3">
-      <div class="card"><h3>Awake with the lid closed</h3><p>A small background service keeps the Mac running while it is plugged in. On battery it sleeps normally.</p></div>
+      <div class="card"><h3>Awake with the lid closed</h3><p>A small background service keeps the Mac running with the lid closed. Plugged in is best; on battery it also stays awake until the battery runs out.</p></div>
       <div class="card"><h3>Private by design</h3><p>Your phone and Mac talk directly over Tailscale. There is no Remote Wake account and no server of ours in the middle.</p></div>
       <div class="card"><h3>A real terminal</h3><p>Full-screen programs, an extra keys row for Esc, Tab and Ctrl, and automatic reconnect when the network drops.</p></div>
     </div>
   </section>
 
   <section id="download">
-    <div class="head"><h2>Download</h2><p class="muted">Version 0.3.2. Both downloads are free. You also need a free Tailscale account.</p></div>
+    <div class="head"><h2>Download</h2><p class="muted">Version 0.4.0. Both downloads are free. You also need a free Tailscale account.</p></div>
     <div class="dl">
       <div class="card">
         <h3>Remote Wake for Mac</h3>
         <ul><li>Apple silicon Macs (M1 and newer), macOS 13 or later</li><li>Includes Tailscale, so nothing else to install</li></ul>
         <a class="abtn" data-act id="dl-mac" data-label="DOWNLOAD FOR MAC (.dmg)" href="https://github.com/Guru-raghav3245/remote-wake/releases/latest/download/Remote-Wake.dmg">[ DOWNLOAD FOR MAC (.dmg) ]</a>
-        <div class="sha">sha256 e8777f00954282a1bbd3ad664bbc8b5b6a493a7f15a23b92c7158f4d42f5b354</div>
+        <div class="sha">sha256 b622d10738931728d19962a2b101eae035f1ccc8242237531bd2a4f2df1141b7</div>
       </div>
       <div class="card">
         <h3>Remote Wake for Android</h3>
         <ul><li>64-bit ARM Android phones (almost every phone sold in the last several years)</li><li>Installed from the file, not from the Play Store</li></ul>
         <a class="abtn" data-act id="dl-apk" data-label="DOWNLOAD FOR ANDROID (.apk)" href="https://github.com/Guru-raghav3245/remote-wake/releases/latest/download/RemoteWake.apk">[ DOWNLOAD FOR ANDROID (.apk) ]</a>
-        <div class="sha">sha256 5b3a61b2754e50d5cb0aa3bce5475681158cc2e1257209a32c747ed46fd715b4</div>
+        <div class="sha">sha256 8dd05de052c15b6294522ac65275a43bc5f89fbe9f9f9924a213b224433d1692</div>
       </div>
     </div>
     <div class="note"><b>Expect two warnings.</b> The apps are not yet signed with a paid developer certificate. On the Mac, right-click the app and choose Open the first time. On Android, allow installs from your browser, and tap "Install anyway" if Play Protect asks.</div>
@@ -230,7 +230,7 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
 
   <section id="faq">
     <div class="head"><h2>Questions</h2></div>
-<details><summary>Does my Mac stay awake on battery?</summary><p>No. It stays awake only while plugged in. On battery it sleeps like normal, which protects your battery.</p></details>
+<details><summary>Does my Mac stay awake on battery?</summary><p>Yes. It stays awake on battery too, but when the battery runs out the Mac shuts down and cannot be reached until someone plugs it in. The apps warn you whenever the Mac is unplugged. Keep it plugged in for long stays, and do not close it in a bag: a Mac that never sleeps gets warm.</p></details>
     <details><summary>What is Tailscale and do I need an account?</summary><p>Tailscale makes the private link between your devices. You need a free account, and you sign in once on the Mac and once on the phone with the same account.</p></details>
     <details><summary>Every so often my phone asks me to approve a connection.</summary><p>That is Tailscale's safety check, about every 12 hours. The app shows an Approve button that opens the approval page.</p></details>
     <details><summary>Claude Code or another tool asks me to log in on the phone?</summary><p>Tools like Claude Code keep their login in the Mac's Keychain, which a phone connection cannot open. The Mac app solves this with <b>Phone sessions</b>, which are always on: phone terminals join a session in your desktop login, where those saved logins work. The app adds a short, marked block to your <code>~/.zshrc</code> (delete it and the app adds it back at the next start) and needs the Mac to be logged in (a locked screen is fine).</p></details>
@@ -256,7 +256,7 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
         <div class="hero2">
           <div class="stage"><pre class="asc" id="asc">AWAKE</pre></div>
           <div class="pathl">[phone] ------------------o------------------ [mac awake]</div>
-          <div class="act"><a class="abtn quiet" data-label="STAY AWAKE: ON" tabindex="-1">[ STAY AWAKE: ON ]</a><p>Your Mac stays awake with the lid closed while it is plugged in.</p></div>
+          <div class="act"><a class="abtn quiet" data-label="STAY AWAKE: ON" tabindex="-1">[ STAY AWAKE: ON ]</a><p>Your Mac stays awake with the lid closed, plugged in or not.</p></div>
         </div>
         <div class="rd">
           <div><small>power</small><span><span class="dot"></span>AC plugged in</span></div>

@@ -17,7 +17,7 @@ cat > "$A/Contents/Info.plist" <<P
 <key>CFBundleExecutable</key><string>RemoteWake</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.3.2</string>
+<key>CFBundleShortVersionString</key><string>0.4.0</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 </dict></plist>
 P
