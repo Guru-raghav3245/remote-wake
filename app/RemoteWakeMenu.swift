@@ -318,7 +318,9 @@ func value(_ s: String) -> some View { Text(s).font(ff(13)).foregroundStyle(T.te
 struct WordGrid { let cols: Int, rows: Int, a: [UInt8] }
 func makeWord(_ word: String, cols: Int, rows: Int) -> WordGrid {
     let chars = Array(word), gap: CGFloat = 2, xs: CGFloat = 1.23   // cells are 7 tall by 5.7 wide: draw letters wider so they look natural on screen
-    func font(_ s: CGFloat, _ c: Character = "A") -> NSFont { NSFont.systemFont(ofSize: s, weight: c == "S" ? .heavy : .black) }   // S one step lighter: at .black its two curves close up into a blob
+    // S one step lighter (at .black its two curves close up into a blob); A and E two steps lighter (at .black A loses the hole in its middle
+    // and E's two gaps fill in, because the grid is only 12 rows tall)
+    func font(_ s: CGFloat, _ c: Character = "A") -> NSFont { NSFont.systemFont(ofSize: s, weight: c == "S" ? .heavy : (c == "A" || c == "E") ? .bold : .black) }
     func widths(_ s: CGFloat) -> [CGFloat] { chars.map { NSAttributedString(string: String($0), attributes: [.font: font(s, $0)]).size().width * xs } }
     var fs = CGFloat(rows) * 1.25, ws = widths(fs)
     func total() -> CGFloat { ws.reduce(0, +) + gap * CGFloat(chars.count - 1) }
@@ -421,7 +423,7 @@ extension Model {
     var ready: Bool { installed && daemonCurrent && tsState != "not installed" }
     var awakeWord: (String, Color) { !running ? ("Off", T.danger) : (holding ? ("Awake", onAC ? T.accent : T.warn) : ("Starting", T.warn)) }
     var heroTitle: String { !running ? "Stay awake is off" : (holding ? (onAC ? "Your Mac is staying awake" : "Awake on battery") : "Starting") }
-    var heroText: String { !running ? "Your Mac sleeps normally." : (holding ? (onAC ? "Safe to close the lid. Keep it plugged in for long stays." : "Plug in soon. If the battery runs out, this Mac shuts down.") : "Setting up stay awake…") }
+    var heroText: String { !running ? "Your Mac sleeps normally." : (holding ? (onAC ? "Safe to close the lid. Keep it plugged in for long stays." : "") : "Setting up stay awake…") }
     var stayAwake: Binding<Bool> { Binding(get: { self.running }, set: { _ in self.toggle() }) }
 }
 
@@ -512,7 +514,7 @@ struct Hero: View {
                     if !m.running { Text("! Action needed: your phone cannot reach this Mac while it sleeps.").font(ff(12, .semibold)).foregroundStyle(T.danger) }
                     if m.running && m.holding && !m.onAC { Text("! On battery: if it runs out, your Mac shuts down and your phone cannot reach it until someone plugs it in.").font(ff(12, .semibold)).foregroundStyle(T.warn) }
                     if m.installed && !m.daemonCurrent { Text("! Update needed so your Mac also stays awake on battery.").font(ff(12, .semibold)).foregroundStyle(T.warn); AsciiButton("UPDATE", primary: false) { m.install() }.disabled(m.busy) }
-                    Text(m.heroText).font(ff(12)).foregroundStyle(T.muted)
+                    if !m.heroText.isEmpty { Text(m.heroText).font(ff(12)).foregroundStyle(T.muted) }
                 }.fixedSize(horizontal: false, vertical: true)
             }
         }.card()
