@@ -28,8 +28,21 @@ class _FilesPageState extends State<FilesPage> {
   @override
   void initState() { super.initState(); _list(null); }
 
+  // A command started over SSH is a child of tailscaled, so macOS would ask (on the Mac's screen) before it may read Desktop, Documents
+  // or Downloads. The phone-session tmux server belongs to the helper app, which has Full Disk Access, so run the command inside it.
+  // The command goes into a script file and its output into a temp dir, then is copied back out (binary-safe). Without a running
+  // phone session it runs directly.
+  static String _viaTmux(String cmd) {
+    const t = r'"$HOME/Library/Application Support/Remote Wake/tmux"';
+    return 'if [ -x $t ] && $t -L remotewake has-session 2>/dev/null; then '
+        'd=\$(mktemp -d /tmp/rwf.XXXXXX); printf %s ${_q(cmd)} > \$d/c.sh; '
+        '$t -L remotewake run-shell "sh \$d/c.sh >\$d/o 2>\$d/e; echo \\\$? >\$d/r"; '
+        'rc=\$(cat \$d/r); cat \$d/o; rm -rf \$d; exit \$rc; '
+        'else $cmd; fi';
+  }
+
   Future<String> _run(String cmd, String dest) async =>
-      Engine.fetch('${widget.ip}:22', widget.user, await Store.hostKey(widget.ip), cmd, dest);
+      Engine.fetch('${widget.ip}:22', widget.user, await Store.hostKey(widget.ip), _viaTmux(cmd), dest);
 
   // [to] null = the phone session's current folder (tmux pane path), else home
   Future<void> _list(String? to) async {
