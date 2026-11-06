@@ -23,10 +23,13 @@ class Home extends StatefulWidget {
 class _HomeState extends State<Home> {
   Map<String, dynamic> st = {'state': 'NotStarted'};
   Timer? t;
+  bool edit = false;
+  Set<String> hidden = {};
 
   @override
   void initState() {
     super.initState();
+    Store.hidden().then((v) { if (mounted) setState(() => hidden = v); });
     t = Timer.periodic(const Duration(seconds: 2), (_) {
       final n = Engine.state();
       if (n['authUrl'] != st['authUrl'] && (n['authUrl'] ?? '') != '') debugPrint('AUTHURL ${n['authUrl']}'); // dev aid: lets a test harness open it
@@ -111,12 +114,37 @@ class _HomeState extends State<Home> {
     ]);
   }
 
+  Future<void> _setHidden(String ip, bool hide) async {
+    final n = {...hidden};
+    hide ? n.add(ip) : n.remove(ip);
+    await Store.setHidden(n);
+    if (mounted) setState(() => hidden = n);
+  }
+
+  // Removing only hides the computer on this phone: a phone cannot delete a device from the Tailscale account (that needs the admin console).
+  Future<void> _remove(Map p) async {
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('Remove ${p['name']}?', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        content: Text('This hides it from the list on this phone. It stays in your Tailscale account; to delete it there, use the admin console. You can bring it back with Edit.', style: TextStyle(color: c.sage.muted, fontSize: 13, height: 1.5)),
+        actionsPadding: const EdgeInsets.fromLTRB(Sp.lg, 0, Sp.lg, Sp.lg),
+        actions: [
+          TextButton(onPressed: () => launchUrl(Uri.parse('https://login.tailscale.com/admin/machines'), mode: LaunchMode.externalApplication), child: const Text('Admin console')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          FilledButton(style: FilledButton.styleFrom(backgroundColor: c.sage.danger, foregroundColor: Colors.white), onPressed: () => Navigator.pop(c, true), child: const Text('Remove')),
+        ],
+      ),
+    );
+    if (go == true) await _setHidden('${p['ip']}', true);
+  }
+
   Widget _computer(BuildContext c, Map p) {
     final s = c.sage, online = p['online'] == true;
     return Opacity(
       opacity: online ? 1 : .6,
       child: AppCard(
-        onTap: online ? () => _open(p) : null,
+        onTap: online && !edit ? () => _open(p) : null,
         child: Row(children: [
           Container(width: 44, height: 44, decoration: BoxDecoration(color: s.bg, border: Border.all(color: s.line), borderRadius: BorderRadius.circular(12)), child: Icon(Icons.laptop_mac, color: online ? s.accent : s.muted)),
           const SizedBox(width: Sp.lg),
@@ -125,7 +153,8 @@ class _HomeState extends State<Home> {
             const SizedBox(height: Sp.xs),
             StatusWord(online ? 'Online' : 'Offline', online ? s.accent : s.muted),
           ])),
-          if (online) Text('>', style: TextStyle(color: s.accent, fontSize: 20, fontWeight: FontWeight.w700)),
+          if (edit) IconButton(tooltip: 'Remove from list', icon: Icon(Icons.remove_circle_outline, color: s.danger), onPressed: () => _remove(p))
+          else if (online) Text('>', style: TextStyle(color: s.accent, fontSize: 20, fontWeight: FontWeight.w700)),
         ]),
       ),
     );
@@ -135,7 +164,9 @@ class _HomeState extends State<Home> {
   Widget build(BuildContext c) {
     final s = c.sage;
     final running = st['state'] == 'Running';
-    final peers = ((st['peers'] as List?) ?? []).cast<Map>().where((p) => p['os'] != 'android' && p['os'] != 'iOS').toList()
+    final all = ((st['peers'] as List?) ?? []).cast<Map>().where((p) => p['os'] != 'android' && p['os'] != 'iOS').toList();
+    final gone = all.where((p) => hidden.contains(p['ip'])).toList();
+    final peers = all.where((p) => !hidden.contains(p['ip'])).toList()
       ..sort((a, b) => ((b['online'] == true ? 2 : 0) + (b['os'] == 'macOS' ? 1 : 0)).compareTo((a['online'] == true ? 2 : 0) + (a['os'] == 'macOS' ? 1 : 0)));
     return Scaffold(
       appBar: AppBar(
@@ -151,7 +182,10 @@ class _HomeState extends State<Home> {
         _connection(c),
         if (running) ...[
           const SizedBox(height: Sp.xl),
-          const Caption('Your computers'),
+          Row(children: [
+            const Expanded(child: Caption('Your computers')),
+            if (all.isNotEmpty) TextButton(style: TextButton.styleFrom(minimumSize: const Size(48, 32), padding: const EdgeInsets.symmetric(horizontal: Sp.sm)), onPressed: () => setState(() => edit = !edit), child: Text(edit ? 'Done' : 'Edit')),
+          ]),
           const SizedBox(height: Sp.md),
           if (peers.isEmpty)
             AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -163,6 +197,15 @@ class _HomeState extends State<Home> {
             ]))
           else
             for (final p in peers) Padding(padding: const EdgeInsets.only(bottom: Sp.md), child: _computer(c, p)),
+          if (edit && gone.isNotEmpty) ...[
+            const SizedBox(height: Sp.md),
+            Caption('Removed (${gone.length})'),
+            const SizedBox(height: Sp.md),
+            for (final p in gone) Padding(padding: const EdgeInsets.only(bottom: Sp.md), child: AppCard(child: Row(children: [
+              Expanded(child: Text('${p['name']}', style: TextStyle(fontSize: 14, color: s.muted))),
+              TextButton(onPressed: () => _setHidden('${p['ip']}', false), child: const Text('Restore')),
+            ]))),
+          ],
         ],
       ]),
     );
