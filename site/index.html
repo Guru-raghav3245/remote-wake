@@ -37,6 +37,7 @@ code{color:var(--accent)}
 .page{max-width:1180px;margin:0 auto;position:relative;padding:0 var(--s4) 0 calc(var(--rw) + var(--s4))}
 @media(min-width:860px){.page{padding:0 var(--s6) 0 calc(var(--rw) + var(--s6))}#rose{left:calc((max(0px,(100vw - 1180px) / 2) + var(--s6) + 17px) / 2)}}
 #rose{position:fixed;top:0;bottom:0;left:calc((max(0px,(100vw - 1180px) / 2) + var(--s4) + 17px) / 2);width:var(--rw);height:100vh;pointer-events:none;z-index:1}
+@media(max-width:859px){:root{--rw:0px}#rose{display:none}}
 
 /* nav */
 nav{display:flex;align-items:center;gap:var(--s5);padding:var(--s4) 0}
@@ -53,6 +54,7 @@ nav .links a:hover{color:var(--accent)}
 .abtn:hover{background:rgba(123,224,176,.14);color:var(--text)}
 .abtn:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
 .abtn span{display:block}
+.abtn .t,.abtn .b{font-size:7px;line-height:1.5}
 
 /* hero */
 .hero{padding:var(--s8) 0 var(--s7);display:grid;gap:var(--s5);justify-items:start}
@@ -281,7 +283,7 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
     var l=a.getAttribute("data-label"),n=l.length+6;
     a.setAttribute("aria-label",l.toLowerCase().replace(/^./,function(c){return c.toUpperCase()}));
     a.innerHTML='<span aria-hidden="true" class="t"></span><span aria-hidden="true">|  '+l+'  |</span><span aria-hidden="true" class="b"></span>';
-    a._n=n;draw(a,0);
+    a._n=Math.round(n*13/7);draw(a,0);   // border runs at 7px, so it needs 13/7 as many characters to span the label line
   });
   function line(n,t,k){var s="+";for(var i=1;i<n-1;i++){s+=k?RAMP[Math.floor((Math.sin(i*.55-t*.3+k)+1)/2*9)]:"-"}return s+"+"}
   function draw(a,t){var act=a.hasAttribute("data-act")&&!calm;a.querySelector(".t").textContent=line(a._n,t,act?1:0);a.querySelector(".b").textContent=line(a._n,t,act?2.4:0)}
@@ -354,15 +356,18 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
     sp=X.length;sx=Float32Array.from(X);sy=Float32Array.from(Y);sz=Float32Array.from(Z);snx=Float32Array.from(NX);sny=Float32Array.from(NY);snz=Float32Array.from(NZ);
   }
 
-  var CW,CH,cols,rows,dpr,sc,v0,tilt=.5,spin=0,target=0,raf=0,buf,col;
+  var CW,CH,cols,rows,dpr,sc,v0,tilt=.5,spin=0,target=0,raf=0,buf,col,shift=0;
   function size(){
-    var w=cv.clientWidth,h=cv.clientHeight,small=w<120;dpr=Math.min(devicePixelRatio||1,2);
-    CW=small?4:5;CH=small?6:8;cols=Math.floor(w/CW);rows=Math.floor(h/CH);sc=cols/2.3;var pad=Math.round(h*.06/CH);v0=pad+Math.round(sc*CW/CH*1.15+1);buildStem((rows-Math.round(pad*1.5)-v0)/(sc*CW/CH*Math.cos(tilt)));   // pad: breathing room above the bloom and below the stem
+    var w=cv.clientWidth,h=cv.clientHeight,small=w<120;if(!w){cols=0;return}   // hidden on narrow windows
+    dpr=Math.min(devicePixelRatio||1,2);
+    CW=small?4:5;CH=small?6:8;cols=Math.floor(w/CW);rows=Math.floor(h/CH);sc=cols/2.3;var pad=Math.round(h*.06/CH);v0=pad+Math.round(sc*CW/CH*1.15+1);buildStem(.7*(rows-Math.round(pad*1.5)-v0)/(sc*CW/CH*Math.cos(tilt)));   // pad: breathing room above the bloom and below the stem
     cv.width=w*dpr;cv.height=h*dpr;g.setTransform(dpr,0,0,dpr,0,0);g.font="600 "+CH+"px ui-monospace,Menlo,monospace";g.textBaseline="top";
-    buf=new Float32Array(cols*rows);col=new Uint8Array(cols*rows);draw();
+    buf=new Float32Array(cols*rows);col=new Uint8Array(cols*rows);
+    var keep=spin,top=rows,bot=-1;shift=0;for(var t=0;t<4;t++){var e=draw(t*PI/2,1);if(e[0]<top)top=e[0];if(e[1]>bot)bot=e[1]}spin=keep;shift=Math.round((rows-1-bot-top)/2);   // centre the art: same gap above the bloom and below the stem
+    draw();
   }
-  function draw(){
-    if(!cols)return;var w=cv.clientWidth,h=cv.clientHeight,cs=Math.cos(spin),sn=Math.sin(spin),ct=Math.cos(tilt),st=Math.sin(tilt);
+  function draw(sp0,dry){
+    if(!cols)return;if(sp0!==undefined)spin=sp0;var w=cv.clientWidth,h=cv.clientHeight,cs=Math.cos(spin),sn=Math.sin(spin),ct=Math.cos(tilt),st=Math.sin(tilt);
     var u0=cols/2,d,bright=new Float32Array(cols*rows);buf.fill(-9);col.fill(0);
     function put(x,y,z,Nx,Ny,Nz,kind,rad){
       var X=x*cs-y*sn,Y=x*sn+y*cs,NX2=Nx*cs-Ny*sn,NY2=Nx*sn+Ny*cs;      // spin about the stem
@@ -375,7 +380,8 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
     }
     for(var k=0;k<np;k++)put(px[k],py[k],pz[k],nx[k],ny[k],nz[k],1,ra[k]);
     for(k=0;k<sp;k++)put(sx[k],sy[k],sz[k],snx[k],sny[k],snz[k],2,.6);
-    g.clearRect(0,0,w,h);var oy=(h-rows*CH)/2,ox=(w-cols*CW)/2;
+    if(dry){var lo=rows,hi=-1;for(var q=0;q<buf.length;q++)if(buf[q]>-9){var rr=(q/cols)|0;if(rr<lo)lo=rr;if(rr>hi)hi=rr}return[lo,hi]}
+    g.clearRect(0,0,w,h);var oy=(h-rows*CH)/2+shift*CH,ox=(w-cols*CW)/2;
     for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
       k=r*cols+c;if(buf[k]<=-9)continue;var b=bright[k],ch=RAMP[Math.min(RAMP.length-1,Math.floor(b*RAMP.length))];if(ch===" ")continue;
       g.fillStyle=col[k]===2?"rgba(123,224,176,"+(.55+Math.min(1,b+.35)*.45)+")":"rgba("+Math.round(190+65*b)+","+Math.round(40+90*b*b)+","+Math.round(60+90*b*b)+","+(.45+b*.55)+")";
