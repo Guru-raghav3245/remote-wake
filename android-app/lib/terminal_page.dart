@@ -230,11 +230,11 @@ class _TerminalPageState extends State<TerminalPage> {
       appBar: AppBar(
         titleSpacing: 0,
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(widget.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-          Text('${widget.user}@${widget.ip}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: s.muted)),
+          Tooltip(message: '${widget.user}@${widget.ip}', child: Text(widget.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+          const SizedBox(height: 2),
+          StatusWord(tone.$1, tone.$2, key: const Key('tstatus')),
         ]),
         actions: [
-          StatusWord(tone.$1, tone.$2, key: const Key('tstatus')),
           IconButton(
             tooltip: 'Files on this Mac',
             icon: Icon(Icons.folder_open_outlined, color: s.muted),
