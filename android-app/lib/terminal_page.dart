@@ -257,7 +257,7 @@ class _TerminalPageState extends State<TerminalPage> {
           AnimatedSize(duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic, alignment: Alignment.centerLeft, child: Row(mainAxisSize: MainAxisSize.min, children: [
             StatusWord(tone.$1, tone.$2, key: const Key('tstatus')),
             if (onBattery && status.startsWith('connected')) ...[
-              Text('  ·  ', style: TextStyle(fontSize: 13, color: s.muted)),
+              Padding(padding: const EdgeInsets.symmetric(horizontal: Sp.sm), child: Text('·', style: TextStyle(fontSize: 13, color: s.muted))),
               Flexible(child: Text('Not charging', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: s.warn))),
             ],
           ])),
