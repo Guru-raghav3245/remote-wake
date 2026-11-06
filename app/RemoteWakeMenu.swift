@@ -111,6 +111,18 @@ let permText = "Programs you run from your phone may need to read your files (De
 var powerChanged: (() -> Void)?
 let helperID = "com.guru.remotewake.menu.helper"
 var grantClickedAt: Date?
+// A running process keeps the answer it had at launch, so the app cannot tell from the helper that the grant is on. After "Allow access" the
+// main app therefore starts a throw-away copy of the helper (`--probe-fda`: checks Full Disk Access, writes the answer, exits before any UI)
+// every couple of seconds. A new process sees the grant at once, and then the real helper is restarted so it has it too.
+let probeFile = phoneDir + "/perms-probe.json"
+func probeHelper() {
+    let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+    p.arguments = ["-n", "-g", "-a", mainAppURL.appendingPathComponent("Contents/Library/LoginItems/Remote Wake Menu.app").path, "--args", "--probe-fda"]
+    try? p.run()
+}
+func probeSaysGranted() -> Bool { (((try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: probeFile)))) as? [String: Bool]) ?? [:])["disk"] == true }
+weak var mainModel: Model?
+weak var appDelegate: AppDelegate?
 func restartHelper() {
     NSRunningApplication.runningApplications(withBundleIdentifier: helperID).forEach { $0.terminate() }
     DispatchQueue.global().async {
@@ -156,6 +168,7 @@ struct LogLine: Identifiable { let id: Int; let t: Date; let tag: String; let ms
     }
 
     init() {
+        mainModel = self
         readState()
         note("app", "Remote Wake started"); note("tailscale", tsState == "Running" ? "running · \(tsIP)" : tsState, tsState == "Running" ? T.accent : T.warn)
         note("daemon", running ? "stay awake on" : "stay awake off", running ? T.accent : T.danger)
@@ -431,6 +444,8 @@ extension Model {
     var permsMissing: String { permNames.filter { perms[$0.key] != true }.map { $0.value }.sorted().joined(separator: ", ") }
     func grantAccess() {
         grantClickedAt = Date()
+        try? FileManager.default.removeItem(atPath: probeFile)
+        appDelegate?.startProbing()
         note("you", "opened Full Disk Access settings", T.pink)
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
     }
@@ -749,6 +764,7 @@ func menuIcon(on: Bool) -> NSImage {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ n: Notification) {
+        appDelegate = self
         guard !isHelper else { return }
         let id = helperID
         try? SMAppService.loginItem(identifier: id).register()
@@ -760,6 +776,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     var lastRestart = Date.distantPast
+    var probeTimer: Timer?
+    func startProbing() {
+        guard !isHelper, probeTimer == nil else { return }
+        probeTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] t in
+            guard let self, let c = grantClickedAt, Date().timeIntervalSince(c) < 600, !diskAccessKnown() else { t.invalidate(); self?.probeTimer = nil; return }
+            if probeSaysGranted() {
+                if Date().timeIntervalSince(self.lastRestart) > 15 { self.lastRestart = Date(); restartHelper()
+                    for d in [3.0, 5.0, 8.0] { DispatchQueue.main.asyncAfter(deadline: .now() + d) { Task { @MainActor in mainModel?.refresh() } } } }
+            } else { probeHelper() }
+        }
+    }
     func applicationDidBecomeActive(_ n: Notification) {   // back from System Settings after clicking Allow access
         guard !isHelper, let t = grantClickedAt, Date().timeIntervalSince(t) < 600, !diskAccessKnown(), Date().timeIntervalSince(lastRestart) > 15 else { return }
         lastRestart = Date(); restartHelper()
@@ -782,4 +809,11 @@ struct MainApp: App {
     }
 }
 
-@main enum Entry { static func main() { if isHelper { MenuApp.main() } else { MainApp.main() } } }
+@main enum Entry { static func main() {
+    if isHelper && CommandLine.arguments.contains("--probe-fda") {   // see probeHelper(): answer and leave, no menu icon
+        try? FileManager.default.createDirectory(atPath: phoneDir, withIntermediateDirectories: true)
+        try? JSONSerialization.data(withJSONObject: permStatus()).write(to: URL(fileURLWithPath: probeFile))
+        exit(0)
+    }
+    if isHelper { MenuApp.main() } else { MainApp.main() }
+} }

@@ -62,7 +62,15 @@ class _TerminalPageState extends State<TerminalPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _open()); // open after layout so the PTY gets the real size
   }
 
+  bool opening = false;
+  Timer? blockedT;
   Future<void> _open() async {
+    if (opening) return;
+    opening = true;
+    try { await _open0(); } finally { opening = false; }
+  }
+
+  Future<void> _open0() async {
     final sw = Stopwatch()..start();
     final pin = await Store.hostKey(widget.ip);
     final bt = Timer.periodic(const Duration(milliseconds: 500), (_) {
@@ -79,11 +87,14 @@ class _TerminalPageState extends State<TerminalPage> {
       final ok = chk.isEmpty && RegExp(r'"disk"\s*:\s*true').hasMatch(await File(tmp).readAsString());
       if (!ok) {
         bt.cancel();
+        // while blocked, look again every few seconds and start the session by itself once the Mac has the permission
+        blockedT ??= Timer.periodic(const Duration(seconds: 3), (_) { if (blocked != null && mounted) _open(); });
         setState(() { approveUrl = null; blocked = chk.isEmpty ? 'This Mac is waiting for you to allow Full Disk Access.' : 'Remote Wake is not set up on this Mac yet.'; status = 'blocked'; });
         return;
       }
     }
     if (blocked != null) setState(() => blocked = null);
+    blockedT?.cancel(); blockedT = null;
     final r = await Engine.shellOpen('${widget.ip}:22', widget.user, pin, term.viewWidth, term.viewHeight);
     bt.cancel();
     if (!mounted) { if (r > 0) Engine.shellClose(r); return; }
@@ -272,6 +283,7 @@ class _TerminalPageState extends State<TerminalPage> {
   @override
   void dispose() {
     powerT?.cancel();
+    blockedT?.cancel();
     _stopPowerWatch();
     Native.stop();
     rp?.close();
