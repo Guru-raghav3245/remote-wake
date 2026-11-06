@@ -23,7 +23,7 @@ class Home extends StatefulWidget {
 class _HomeState extends State<Home> {
   Map<String, dynamic> st = {'state': 'NotStarted'};
   Timer? t;
-  bool edit = false;
+  bool edit = false, showOff = false; // showOff: the folded "Not reachable" group is open
   Set<String> hidden = {};
 
   @override
@@ -139,6 +139,16 @@ class _HomeState extends State<Home> {
     if (go == true) await _setHidden('${p['ip']}', true);
   }
 
+  // " · last seen 3 days ago" from the engine's unix seconds ('' when unknown)
+  static String _ago(Object? seen) {
+    final n = seen is int ? seen : 0;
+    if (n <= 0) return '';
+    final d = DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(n * 1000));
+    String u(int v, String w) => '$v $w${v == 1 ? '' : 's'} ago';
+    final t = d.inMinutes < 1 ? 'just now' : d.inMinutes < 60 ? u(d.inMinutes, 'minute') : d.inHours < 24 ? u(d.inHours, 'hour') : u(d.inDays, 'day');
+    return ' · last seen $t';
+  }
+
   Widget _computer(BuildContext c, Map p) {
     final s = c.sage, online = p['online'] == true;
     return Opacity(
@@ -151,7 +161,7 @@ class _HomeState extends State<Home> {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('${p['name']}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             const SizedBox(height: Sp.xs),
-            StatusWord(online ? 'Online' : 'Offline', online ? s.accent : s.muted),
+            StatusWord(online ? 'Online' : 'Offline${_ago(p['seen'])}', online ? s.accent : s.muted),
           ])),
           if (edit) IconButton(tooltip: 'Remove from list', icon: Icon(Icons.remove_circle_outline, color: s.danger), onPressed: () => _remove(p))
           else if (online) Text('>', style: TextStyle(color: s.accent, fontSize: 20, fontWeight: FontWeight.w700)),
@@ -196,7 +206,21 @@ class _HomeState extends State<Home> {
               AsciiButton('Open the guide', primary: false, onPressed: _tutorial),
             ]))
           else
-            for (final p in peers) Padding(padding: const EdgeInsets.only(bottom: Sp.md), child: _computer(c, p)),
+            for (final p in peers.where((p) => p['online'] == true)) Padding(padding: const EdgeInsets.only(bottom: Sp.md), child: _computer(c, p)),
+          // offline computers fold away while another one is online; with nothing online (or while editing) they show, so a Mac that went down is never hidden
+          if (peers.any((p) => p['online'] != true)) ...[
+            if (peers.any((p) => p['online'] == true) && !edit)
+              InkWell(
+                onTap: () => setState(() => showOff = !showOff),
+                child: Padding(padding: const EdgeInsets.symmetric(vertical: Sp.sm), child: Row(children: [
+                  Icon(showOff ? Icons.expand_less : Icons.expand_more, color: s.muted),
+                  const SizedBox(width: Sp.sm),
+                  Text('Not reachable (${peers.where((p) => p['online'] != true).length})', style: TextStyle(color: s.muted, fontWeight: FontWeight.w700)),
+                ])),
+              ),
+            if (showOff || edit || !peers.any((p) => p['online'] == true))
+              for (final p in peers.where((p) => p['online'] != true)) Padding(padding: const EdgeInsets.only(bottom: Sp.md), child: _computer(c, p)),
+          ],
           if (edit && gone.isNotEmpty) ...[
             const SizedBox(height: Sp.md),
             Caption('Removed (${gone.length})'),

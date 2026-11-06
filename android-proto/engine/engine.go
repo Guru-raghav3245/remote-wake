@@ -101,11 +101,16 @@ func rw_state() *C.char {
 		IP     string `json:"ip"`
 		OS     string `json:"os"`
 		Online bool   `json:"online"`
+		Seen   int64  `json:"seen"` // unix seconds the peer was last seen, 0 if unknown
 	}
 	peers := []peer{}
 	for _, p := range st.Peer {
 		if len(p.TailscaleIPs) > 0 {
-			peers = append(peers, peer{p.HostName, p.TailscaleIPs[0].String(), p.OS, p.Online})
+			var seen int64
+			if !p.LastSeen.IsZero() {
+				seen = p.LastSeen.Unix()
+			}
+			peers = append(peers, peer{p.HostName, p.TailscaleIPs[0].String(), p.OS, p.Online, seen})
 		}
 	}
 	b, _ := json.Marshal(map[string]any{"state": st.BackendState, "authUrl": st.AuthURL, "ips": ips, "peers": peers})
