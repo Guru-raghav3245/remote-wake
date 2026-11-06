@@ -255,9 +255,9 @@ class _TerminalPageState extends State<TerminalPage> {
           Tooltip(message: '${widget.user}@${widget.ip}', child: Text(widget.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
           const SizedBox(height: 2),
           AnimatedSize(duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic, alignment: Alignment.centerLeft, child: Row(mainAxisSize: MainAxisSize.min, children: [
-            StatusWord(tone.$1, tone.$2, key: const Key('tstatus')),
+            StatusWord(tone.$1, tone.$2, dot: false, key: const Key('tstatus')),
             if (onBattery && status.startsWith('connected')) ...[
-              const SizedBox(width: Sp.md),
+              Padding(padding: const EdgeInsets.symmetric(horizontal: Sp.sm), child: Text('·', style: TextStyle(fontSize: 13, color: s.muted))),
               Flexible(child: Text('Not charging', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: s.warn))),
             ],
           ])),

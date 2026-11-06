@@ -66,12 +66,15 @@ class AppCard extends StatelessWidget {
 class StatusWord extends StatelessWidget {
   final String word;
   final Color color;
-  const StatusWord(this.word, this.color, {super.key});
+  final bool dot; // false: the word alone, no glowing dot before it
+  const StatusWord(this.word, this.color, {super.key, this.dot = true});
   @override
   // a state change fades the word and eases the dot's colour instead of snapping
   Widget build(BuildContext c) => Row(mainAxisSize: MainAxisSize.min, children: [
-        AnimatedContainer(duration: const Duration(milliseconds: 350), width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withValues(alpha: .7), blurRadius: 8)])),
-        const SizedBox(width: Sp.sm),
+        if (dot) ...[
+          AnimatedContainer(duration: const Duration(milliseconds: 350), width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withValues(alpha: .7), blurRadius: 8)])),
+          const SizedBox(width: Sp.sm),
+        ],
         AnimatedSwitcher(duration: const Duration(milliseconds: 300), child: Text(word, key: ValueKey(word), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color))),
       ]);
 }
