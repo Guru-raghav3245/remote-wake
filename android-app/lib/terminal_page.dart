@@ -42,6 +42,8 @@ class _TerminalPageState extends State<TerminalPage> {
   bool reconnecting = false, gaveUp = false;
   int attempt = 0;
   String? seenUrl; // the engine keeps the last banner; only a NEW link means a new approval is needed
+  String? powerWarn; // the Mac is running on battery
+  Timer? powerT;
   String? blocked; // the Mac has a permission pending (Full Disk Access): no session until it is granted
   String? approveUrl; // Tailscale "check" policy: the Mac asks for a browser approval (link arrives as the SSH banner)
 
@@ -93,6 +95,8 @@ class _TerminalPageState extends State<TerminalPage> {
     if (reconnecting) term.write('\r\n[reconnected: programs outside a phone session were stopped]\r\n');
     reconnecting = false; gaveUp = false; attempt = 0;
     setState(() => status = 'connected in ${sw.elapsedMilliseconds} ms');
+    _checkPower();
+    powerT ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkPower());
     rp = ReceivePort();
     rp!.listen((m) {
       if (m is String) {
@@ -214,8 +218,20 @@ class _TerminalPageState extends State<TerminalPage> {
     return ('Connecting', s.muted);
   }
 
+  // The Mac stays awake on battery too, but it shuts down when the battery runs out and then cannot be reached: warn while it is unplugged.
+  Future<void> _checkPower() async {
+    if (id <= 0 || blocked != null) return;
+    final tmp = '${(await getTemporaryDirectory()).path}/batt.txt';
+    final r = await Engine.fetch('${widget.ip}:22', widget.user, await Store.hostKey(widget.ip), 'pmset -g batt', tmp);
+    if (r.isNotEmpty || !mounted) return;
+    final o = await File(tmp).readAsString();
+    final pct = RegExp(r'(\d+)%').firstMatch(o)?.group(1);
+    setState(() => powerWarn = o.contains('Battery Power') ? 'Your Mac is on battery${pct != null ? ' ($pct%)' : ''}. If it runs out it shuts down and cannot be reached until someone plugs it in.' : null);
+  }
+
   @override
   void dispose() {
+    powerT?.cancel();
     Native.stop();
     rp?.close();
     if (id > 0) Engine.shellClose(id);
@@ -255,6 +271,8 @@ class _TerminalPageState extends State<TerminalPage> {
               bg: s.pinkBg, fg: s.pink, text: 'Tailscale needs you to approve this connection (about every 12 hours).',
               action: FilledButton(style: FilledButton.styleFrom(backgroundColor: s.pink, foregroundColor: s.bg), onPressed: () => launchUrl(Uri.parse(approveUrl!), mode: LaunchMode.externalApplication), child: const Text('Approve')),
             ),
+          if (powerWarn != null)
+            Banner2(bg: s.warnBg, fg: s.warn, text: powerWarn!, lead: Icon(Icons.battery_alert, size: 18, color: s.warn)),
           if (reconnecting)
             Banner2(
               bg: s.warnBg, fg: s.warn, text: gaveUp ? 'Connection lost' : 'Connection lost, reconnecting...',

@@ -1,7 +1,7 @@
 #!/bin/bash
 # usage: sudo ./agent/stayawake-install.sh [user]   (undo: sudo ./agent/stayawake-uninstall.sh)
 # [user] (default: the sudo caller) may then turn it on/off without a password, see the sudoers rule below.
-# Keeps the Mac awake while on AC power (lid closed too). Replaces the old wake-loop agent.
+# Keeps the Mac awake, lid closed too, on AC and on battery. Replaces the old wake-loop agent.
 set -e
 [ "$(id -u)" = 0 ] || { echo "usage: sudo $0"; exit 1; }
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -19,4 +19,4 @@ if [ -n "$U" ]; then  # exactly these four commands, nothing else
   visudo -cf "$T" >/dev/null && install -m 440 -o root -g wheel "$T" /etc/sudoers.d/stayawake; rm -f "$T"
 fi
 sleep 1
-pmset -g assertions | grep -q "PreventSystemSleep .*1" && echo "installed: Mac stays awake on AC" || echo "installed, but no sleep assertion yet (on battery?)"
+pmset -g | grep -q 'SleepDisabled.*1' && echo "installed: Mac stays awake (AC and battery)" || echo "installed, but sleep is not disabled yet"

@@ -2,8 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>com.guru.stayawake</string>
-  <!-- -s: stay awake (lid closed too) only while on AC; on battery the Mac sleeps normally -->
-  <key>ProgramArguments</key><array><string>/usr/bin/caffeinate</string><string>-s</string></array>
+  <!-- Stay awake with the lid closed, on AC and on battery. `pmset disablesleep 1` is what blocks lid-close sleep on battery;
+       it is a persistent system setting, so the script always puts it back to 0 when the daemon is stopped (TERM) or caffeinate ends.
+       caffeinate -s -i adds the normal sleep assertions (what the app reads). -->
+  <key>ProgramArguments</key><array>
+    <string>/bin/sh</string><string>-c</string>
+    <string>C=; trap '[ -n "$C" ] &amp;&amp; kill $C; /usr/bin/pmset -a disablesleep 0; exit 0' TERM INT; /usr/bin/pmset -a disablesleep 1; /usr/bin/caffeinate -s -i &amp; C=$!; wait $C; /usr/bin/pmset -a disablesleep 0</string>
+  </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
 </dict></plist>

@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Menu bar switch for the "stay awake on AC" daemon (agent/com.guru.stayawake.plist).
+// Menu bar switch for the "stay awake" daemon (agent/com.guru.stayawake.plist).
 let label = "com.guru.stayawake"
 let plist = "/Library/LaunchDaemons/\(label).plist"
 let sudoersPath = "/etc/sudoers.d/stayawake"
@@ -131,7 +131,9 @@ struct LogLine: Identifiable { let id: Int; let t: Date; let tag: String; let ms
     @Published var running = false
     @Published var installed = false
     @Published var onAC = true
-    @Published var holding = false     // the daemon really holds a sleep assertion
+    @Published var holding = false     // sleep is really blocked (SleepDisabled, or the sleep assertion)
+    @Published var daemonCurrent = true  // the installed daemon is the version that also stays awake on battery
+    @Published var batteryPct = 0
     @Published var tsState = ""        // Running, NeedsLogin, Stopped, ... or "not installed"
     @Published var tsIP = ""
     @Published var authURL: String?
@@ -161,9 +163,9 @@ struct LogLine: Identifiable { let id: Int; let t: Date; let tag: String; let ms
     func refresh() {
         let o = (running, holding, onAC, tsState, phones.first, phoneOn, tmuxRunning)
         readState()
-        if o.0 != running { running ? note("daemon", "stay awake on · caffeinate -s") : note("daemon", "stay awake off · Mac may sleep", T.danger) }
-        if running && o.1 != holding { holding ? note("power", "sleep blocked") : note("power", "waiting for AC · sleeps on battery", T.warn) }
-        if o.2 != onAC { note("power", onAC ? "AC connected" : "on battery", onAC ? T.accent : T.warn) }
+        if o.0 != running { running ? note("daemon", "stay awake on") : note("daemon", "stay awake off · Mac may sleep", T.danger) }
+        if running && o.1 != holding { holding ? note("power", "sleep blocked") : note("power", "sleep not blocked yet", T.warn) }
+        if o.2 != onAC { note("power", onAC ? "AC connected" : "on battery · plug in or it may shut down", onAC ? T.accent : T.warn) }
         if o.3 != tsState { note("tailscale", tsState == "Running" ? "running · \(tsIP)" : tsState, tsState == "Running" ? T.accent : T.warn) }
         if o.4 != phones.first, let ph = phones.first { let on = !ph.hasSuffix("(offline)"); note("phone", ph.replacingOccurrences(of: " (offline)", with: "") + (on ? " online" : " offline"), on ? T.accent : T.warn) }
         if o.5 != phoneOn { note("session", phoneOn ? "phone sessions on" : "phone sessions off", phoneOn ? T.accent : T.warn) }
@@ -173,8 +175,12 @@ struct LogLine: Identifiable { let id: Int; let t: Date; let tag: String; let ms
     func readState() {
         installed = FileManager.default.fileExists(atPath: plist)
         running = run("/bin/launchctl", ["print", "system/\(label)"]).status == 0
-        onAC = run("/usr/bin/pmset", ["-g", "batt"]).out.contains("AC Power")
-        holding = run("/usr/bin/pmset", ["-g", "assertions"]).out.range(of: #"PreventSystemSleep\s+1"#, options: .regularExpression) != nil
+        let batt = run("/usr/bin/pmset", ["-g", "batt"]).out
+        onAC = batt.contains("AC Power")
+        batteryPct = batt.range(of: #"\d+(?=%)"#, options: .regularExpression).flatMap { Int(batt[$0]) } ?? 0
+        holding = run("/usr/bin/pmset", ["-g"]).out.range(of: #"SleepDisabled\s+1"#, options: .regularExpression) != nil
+            || run("/usr/bin/pmset", ["-g", "assertions"]).out.range(of: #"PreventSystemSleep\s+1"#, options: .regularExpression) != nil
+        daemonCurrent = !installed || ((try? String(contentsOfFile: plist, encoding: .utf8)) ?? "").contains("disablesleep")
         if isHelper {
             try? FileManager.default.createDirectory(atPath: phoneDir, withIntermediateDirectories: true)
             let was = ((try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: permFile)))) as? [String: Bool])?["disk"], now = permStatus()
@@ -412,10 +418,10 @@ extension Model {
         note("you", "opened Full Disk Access settings", T.pink)
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
     }
-    var ready: Bool { installed && tsState != "not installed" }
-    var awakeWord: (String, Color) { !running ? ("Off", T.danger) : (holding ? ("Awake", T.accent) : ("Waiting for AC", T.warn)) }
-    var heroTitle: String { !running ? "Stay awake is off" : (holding ? "Your Mac is staying awake" : "Ready, but on battery") }
-    var heroText: String { !running ? "Your Mac sleeps normally." : (holding ? "Safe to close the lid while it is plugged in." : "Plug in to keep it awake. On battery it sleeps normally.") }
+    var ready: Bool { installed && daemonCurrent && tsState != "not installed" }
+    var awakeWord: (String, Color) { !running ? ("Off", T.danger) : (holding ? ("Awake", onAC ? T.accent : T.warn) : ("Starting", T.warn)) }
+    var heroTitle: String { !running ? "Stay awake is off" : (holding ? (onAC ? "Your Mac is staying awake" : "Awake on battery") : "Starting") }
+    var heroText: String { !running ? "Your Mac sleeps normally." : (holding ? (onAC ? "Safe to close the lid. Keep it plugged in for long stays." : "Plug in soon. If the battery runs out, this Mac shuts down.") : "Setting up stay awake…") }
     var stayAwake: Binding<Bool> { Binding(get: { self.running }, set: { _ in self.toggle() }) }
 }
 
@@ -472,7 +478,7 @@ struct SetupView: View {
                     if m.tsState == "NeedsLogin", let u = m.authURL, let url = URL(string: u) { AsciiButton("SIGN IN TO TAILSCALE") { NSWorkspace.shared.open(url) } }
                     else { AsciiButton("CONNECT TAILSCALE") { m.connect() } }
                 }
-                StepRow(n: 3, title: "Stay awake on AC", text: "Turn this on. Keep the Mac plugged in; on battery it sleeps normally.", done: done[2], active: cur == 2) {
+                StepRow(n: 3, title: "Stay awake", text: "Turn this on. It keeps the Mac awake with the lid closed, plugged in or not. Plugged in is safer: on battery the Mac shuts down when it runs out.", done: done[2], active: cur == 2) {
                     AsciiButton("KEEP MY MAC AWAKE") { m.toggle() }.disabled(m.busy)
                 }
                 if m.needsPerms {
@@ -493,7 +499,7 @@ struct SetupView: View {
 // The one thing that matters: is the Mac staying awake? A big ASCII word, the path to the phone, and the action when action is needed.
 struct Hero: View {
     @ObservedObject var m: Model
-    var info: (String, Color) { !m.running ? ("ASLEEP", T.danger) : (m.holding ? ("AWAKE", T.accent) : ("PLUG IN", T.warn)) }
+    var info: (String, Color) { !m.running ? ("ASLEEP", T.danger) : (m.holding ? ("AWAKE", m.onAC ? T.accent : T.warn) : ("WAIT", T.warn)) }
     var phoneOnline: Bool { m.phones.first.map { !$0.hasSuffix("(offline)") } ?? false }
     var body: some View {
         VStack(alignment: .leading, spacing: S.md) {
@@ -504,6 +510,8 @@ struct Hero: View {
                 else { AsciiButton("STOP STAYING AWAKE", primary: false) { m.toggle() }.disabled(m.busy) }
                 VStack(alignment: .leading, spacing: S.xs) {
                     if !m.running { Text("! Action needed: your phone cannot reach this Mac while it sleeps.").font(ff(12, .semibold)).foregroundStyle(T.danger) }
+                    if m.running && m.holding && !m.onAC { Text("! On battery: if it runs out, your Mac shuts down and your phone cannot reach it until someone plugs it in.").font(ff(12, .semibold)).foregroundStyle(T.warn) }
+                    if m.installed && !m.daemonCurrent { Text("! Update needed so your Mac also stays awake on battery.").font(ff(12, .semibold)).foregroundStyle(T.warn); AsciiButton("UPDATE", primary: false) { m.install() }.disabled(m.busy) }
                     Text(m.heroText).font(ff(12)).foregroundStyle(T.muted)
                 }.fixedSize(horizontal: false, vertical: true)
             }
@@ -525,7 +533,7 @@ struct Readouts: View {
     var body: some View {
         let ph = m.phones.first, phOn = ph != nil && !(ph!.hasSuffix("(offline)"))
         VStack(alignment: .leading, spacing: 0) {
-            Cell(label: "power") { HStack(spacing: S.sm) { Status(word: m.onAC ? "AC" : "battery", color: m.onAC ? T.accent : T.warn); small(m.onAC ? "plugged in" : "sleeps normally") } }
+            Cell(label: "power") { HStack(spacing: S.sm) { Status(word: m.onAC ? "AC" : "battery", color: m.onAC ? T.accent : T.warn); small(m.onAC ? "plugged in" : "\(m.batteryPct)% · may shut down") } }
             line
             Cell(label: "tailscale") {
                 if m.tsState == "Running" { HStack(spacing: S.sm) { Status(word: "running", color: T.accent); small(m.tsIP) } }
@@ -679,7 +687,7 @@ struct MenuView: View {
                 Text("Finish setting up in the app.").font(ff(14)).foregroundStyle(T.muted)
             } else {
                 VStack(alignment: .leading, spacing: S.md) {
-                    InfoRow(label: "Stay awake") { Toggle("Stay awake on AC", isOn: m.stayAwake).labelsHidden().toggleStyle(.switch).tint(T.accent).disabled(m.busy) }
+                    InfoRow(label: "Stay awake") { Toggle("Stay awake", isOn: m.stayAwake).labelsHidden().toggleStyle(.switch).tint(T.accent).disabled(m.busy) }
                     Divider().overlay(T.line)
                     InfoRow(label: "Power") { value(m.onAC ? "Plugged in" : "On battery") }
                     InfoRow(label: "Tailscale") { value(m.tsIP) }
