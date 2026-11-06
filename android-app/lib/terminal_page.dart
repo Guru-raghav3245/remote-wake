@@ -47,6 +47,8 @@ class _TerminalPageState extends State<TerminalPage> {
   bool powerDismissed = false; // the user swiped the battery warning away; it returns after the Mac has been plugged in and unplugged again
   String? powerWarn; // the Mac is running on battery
   Timer? powerT;
+  int powerId = -1;
+  ReceivePort? powerRp;
   String? blocked; // the Mac has a permission pending (Full Disk Access): no session until it is granted
   String? approveUrl; // Tailscale "check" policy: the Mac asks for a browser approval (link arrives as the SSH banner)
 
@@ -99,6 +101,7 @@ class _TerminalPageState extends State<TerminalPage> {
     reconnecting = false; gaveUp = false; attempt = 0;
     setState(() => status = 'connected in ${sw.elapsedMilliseconds} ms');
     _checkPower();
+    _watchPower();
     powerT ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkPower());
     rp = ReceivePort();
     rp!.listen((m) {
@@ -228,16 +231,48 @@ class _TerminalPageState extends State<TerminalPage> {
     final r = await Engine.fetch('${widget.ip}:22', widget.user, await Store.hostKey(widget.ip), 'pmset -g batt', tmp);
     if (r.isNotEmpty || !mounted) return;
     final o = await File(tmp).readAsString();
-    final pct = RegExp(r'(\d+)%').firstMatch(o)?.group(1);
-    final onBatt = o.contains('Battery Power');
+    _applyPower(o.contains('Battery Power'), RegExp(r'(\d+)%').firstMatch(o)?.group(1));
+  }
+
+  void _applyPower(bool onBatt, String? pct) {
+    if (!mounted) return;
     onBattery = onBatt;
     if (!onBatt) powerDismissed = false;
     setState(() => powerWarn = onBatt && !powerDismissed ? 'Your Mac is on battery${pct != null ? ' ($pct%)' : ''}. If it runs out it shuts down and cannot be reached until someone plugs it in.' : null);
   }
 
+  // Follows `pmset -g pslog` over a second SSH channel: the Mac prints a line the moment the power source changes, so the header
+  // updates at once. The 60 s poll above stays as a fallback (it also refreshes the percentage).
+  Future<void> _watchPower() async {
+    _stopPowerWatch();
+    final pin = await Store.hostKey(widget.ip);
+    final w = await Engine.streamOpen('${widget.ip}:22', widget.user, pin, 'pmset -g pslog');
+    if (w < 0) return;
+    if (!mounted) { Engine.shellClose(w); return; }
+    powerId = w;
+    powerRp = ReceivePort();
+    var seen = '';
+    powerRp!.listen((m) {
+      if (m is! String) return;
+      seen += utf8.decode(base64.decode(m), allowMalformed: true);
+      if (seen.length > 4000) seen = seen.substring(seen.length - 2000);
+      final k = seen.lastIndexOf("Now drawing from '");
+      if (k < 0) return;
+      final tail = seen.substring(k);
+      _applyPower(tail.startsWith("Now drawing from 'Battery Power'"), RegExp(r'(\d+)%').allMatches(tail).lastOrNull?.group(1));
+    });
+    await Isolate.spawn(_reader, [powerRp!.sendPort, w]);
+  }
+
+  void _stopPowerWatch() {
+    powerRp?.close(); powerRp = null;
+    if (powerId > 0) { Engine.shellClose(powerId); powerId = -1; }
+  }
+
   @override
   void dispose() {
     powerT?.cancel();
+    _stopPowerWatch();
     Native.stop();
     rp?.close();
     if (id > 0) Engine.shellClose(id);

@@ -1,4 +1,5 @@
 import SwiftUI
+import IOKit.ps
 
 // Menu bar switch for the "stay awake" daemon (agent/com.guru.stayawake.plist).
 let label = "com.guru.stayawake"
@@ -107,6 +108,7 @@ let permText = "Programs you run from your phone may need to read your files (De
 
 // macOS applies Full Disk Access only to processes started after the switch was turned on, and it is the HELPER that needs it (it owns the tmux server).
 // So: restart the helper at launch while the permission is still missing, and again when the app comes to the front after the user clicked Allow access.
+var powerChanged: (() -> Void)?
 let helperID = "com.guru.remotewake.menu.helper"
 var grantClickedAt: Date?
 func restartHelper() {
@@ -157,7 +159,19 @@ struct LogLine: Identifiable { let id: Int; let t: Date; let tag: String; let ms
         readState()
         note("app", "Remote Wake started"); note("tailscale", tsState == "Running" ? "running · \(tsIP)" : tsState, tsState == "Running" ? T.accent : T.warn)
         note("daemon", running ? "stay awake on" : "stay awake off", running ? T.accent : T.danger)
-        timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in Task { @MainActor in self.refresh() } } }
+        timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in Task { @MainActor in self.refresh() } }
+        // macOS tells us the moment the power source changes (plug / unplug): update the power state at once, the 5 s timer does the rest
+        powerChanged = { [weak self] in Task { @MainActor in self?.powerNow() } }
+        let src = IOPSNotificationCreateRunLoopSource({ _ in powerChanged?() }, nil).takeRetainedValue()
+        CFRunLoopAddSource(CFRunLoopGetMain(), src, .defaultMode)
+    }
+
+    func powerNow() {
+        let batt = run("/usr/bin/pmset", ["-g", "batt"]).out, ac = batt.contains("AC Power")
+        batteryPct = batt.range(of: #"\d+(?=%)"#, options: .regularExpression).flatMap { Int(batt[$0]) } ?? batteryPct
+        if ac != onAC { onAC = ac; note("power", ac ? "AC connected" : "on battery · plug in or it may shut down", ac ? T.accent : T.warn) }
+        refresh()
+    }
 
     // Reads the state, then logs whatever changed since last time (so the log follows real events, not guesses).
     func refresh() {

@@ -189,6 +189,18 @@ func rw_last_banner() *C.char { mu.Lock(); defer mu.Unlock(); return C.CString(b
 
 //export rw_shell_open
 func rw_shell_open(addr, user, pinned *C.char, cols, rows C.int) C.int {
+	return openShell(addr, user, pinned, cols, rows, "")
+}
+
+// rw_stream_open runs one command with no PTY and keeps it open; read it with rw_shell_read / rw_shell_wait / rw_shell_alive and
+// close it with rw_shell_close (used to follow `pmset -g pslog`, so a power change reaches the phone at once).
+//
+//export rw_stream_open
+func rw_stream_open(addr, user, pinned, cmd *C.char) C.int {
+	return openShell(addr, user, pinned, 80, 24, C.GoString(cmd))
+}
+
+func openShell(addr, user, pinned *C.char, cols, rows C.int, cmd string) C.int {
 	mu.Lock()
 	s := srv
 	mu.Unlock()
@@ -231,13 +243,20 @@ func rw_shell_open(addr, user, pinned *C.char, cols, rows C.int) C.int {
 		cl.Close()
 		return fail(err)
 	}
-	if err := sess.RequestPty("xterm-256color", int(rows), int(cols), ssh.TerminalModes{ssh.ECHO: 1}); err != nil {
-		cl.Close()
-		return fail(err)
+	if cmd == "" {
+		if err := sess.RequestPty("xterm-256color", int(rows), int(cols), ssh.TerminalModes{ssh.ECHO: 1}); err != nil {
+			cl.Close()
+			return fail(err)
+		}
 	}
 	in, _ := sess.StdinPipe()
 	out, _ := sess.StdoutPipe() // with a PTY the remote merges stderr into stdout
-	if err := sess.Shell(); err != nil {
+	if cmd == "" {
+		if err = sess.Shell(); err != nil {
+			cl.Close()
+			return fail(err)
+		}
+	} else if err = sess.Start(cmd); err != nil {
 		cl.Close()
 		return fail(err)
 	}

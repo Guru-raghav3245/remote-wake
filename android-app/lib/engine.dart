@@ -35,7 +35,15 @@ String _fetch(String addr, String user, String pinned, String cmd, String dest) 
   return using((a) => _take(f(addr.toNativeUtf8(allocator: a), user.toNativeUtf8(allocator: a), pinned.toNativeUtf8(allocator: a), cmd.toNativeUtf8(allocator: a), dest.toNativeUtf8(allocator: a))));
 }
 
+int _streamOpen(String addr, String user, String pinned, String cmd) {
+  final f = _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
+      int Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>)>('rw_stream_open');
+  return using((a) => f(addr.toNativeUtf8(allocator: a), user.toNativeUtf8(allocator: a), pinned.toNativeUtf8(allocator: a), cmd.toNativeUtf8(allocator: a)));
+}
+
 class Engine {
+  /// Runs [cmd] on the Mac and keeps it open (no PTY). Use shellRead/shellWait/shellAlive/shellClose with the returned id (-1 on failure).
+  static Future<int> streamOpen(String addr, String user, String pinned, String cmd) => Isolate.run(() => _streamOpen(addr, user, pinned, cmd));
   /// Runs [cmd] on the Mac and saves its stdout to the local file [dest]. Returns '' or 'ERROR: ...'.
   static Future<String> fetch(String addr, String user, String pinned, String cmd, String dest) => Isolate.run(() => _fetch(addr, user, pinned, cmd, dest));
 
