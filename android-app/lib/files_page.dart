@@ -301,7 +301,7 @@ class _VideoViewState extends State<VideoView> {
             onDoubleTap: () => _seekBy(back ? -10 : 10),
           )),
       ]),
-      if (flash != null) Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: Sp.lg, vertical: Sp.sm), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)), child: Text(flash!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)))),
+      if (flash != null) Align(alignment: const Alignment(0, 0.4), child: Container(padding: const EdgeInsets.symmetric(horizontal: Sp.lg, vertical: Sp.sm), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)), child: Text(flash!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)))),
       if (show) ...[
         Center(child: Row(mainAxisSize: MainAxisSize.min, children: [
           icon(Icons.replay_10, () => _seekBy(-10), size: 36),
