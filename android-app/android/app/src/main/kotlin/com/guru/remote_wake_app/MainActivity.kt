@@ -21,6 +21,7 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 "deviceName" -> result.success(Settings.Global.getString(contentResolver, "device_name") ?: "${Build.MANUFACTURER} ${Build.MODEL}")
+                "version" -> result.success(packageManager.getPackageInfo(packageName, 0).versionName)
                 "stop" -> { stopService(Intent(this, KeepAliveService::class.java)); result.success(null) }
                 // returns true when the app is already exempt from battery optimisation; otherwise opens the system prompt and returns false
                 "batteryExempt" -> {

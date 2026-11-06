@@ -625,6 +625,7 @@ struct HelpSheet: View {
                 }
             }.card()
             HStack { Spacer(); AsciiButton("DONE") { close() }.keyboardShortcut(.defaultAction) }
+            Text("v" + (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")).font(ff(9)).foregroundStyle(T.text.opacity(0.4)).frame(maxWidth: .infinity)
         }.padding(S.xl).frame(width: 440).background(T.bg)
     }
 }

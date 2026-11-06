@@ -109,6 +109,7 @@ class _TutorialPageState extends State<TutorialPage> {
         ])),
         const SizedBox(height: Sp.xl),
         Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => Navigator.pop(c), child: Text(cur == -1 ? 'Close' : 'Skip for now'))),
+        Center(child: FutureBuilder<String>(future: Native.version(), builder: (_, v) => Text(v.hasData ? 'v${v.data}' : '', style: const TextStyle(fontSize: 9, color: Colors.white38)))),
       ]),
     );
   }
