@@ -401,8 +401,13 @@ func rw_fetch(addr, user, pinned, cmd, dest *C.char) *C.char {
 	if err != nil {
 		return C.CString("ERROR: dial: " + err.Error())
 	}
+	mu.Lock()
+	banner = ""
+	mu.Unlock()
+	conn.SetDeadline(time.Now().Add(3 * time.Minute)) // a Tailscale "check" policy holds the handshake until the user approves (link in the banner)
 	c, chans, reqs, err := ssh.NewClientConn(conn, C.GoString(addr), &ssh.ClientConfig{
 		User: C.GoString(user), Timeout: 30 * time.Second,
+		BannerCallback: func(m string) error { mu.Lock(); banner += m; mu.Unlock(); return nil },
 		HostKeyCallback: func(_ string, _ net.Addr, k ssh.PublicKey) error {
 			if pin := C.GoString(pinned); pin != "" && pin != ssh.FingerprintSHA256(k) {
 				return fmt.Errorf("HOSTKEY_CHANGED")
@@ -413,6 +418,7 @@ func rw_fetch(addr, user, pinned, cmd, dest *C.char) *C.char {
 	if err != nil {
 		return C.CString("ERROR: ssh: " + err.Error())
 	}
+	conn.SetDeadline(time.Time{})
 	cl := ssh.NewClient(c, chans, reqs)
 	defer cl.Close()
 	sess, err := cl.NewSession()

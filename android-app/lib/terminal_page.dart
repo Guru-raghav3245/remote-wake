@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:isolate';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:xterm/xterm.dart';
 import 'engine.dart';
@@ -40,6 +42,7 @@ class _TerminalPageState extends State<TerminalPage> {
   bool reconnecting = false, gaveUp = false;
   int attempt = 0;
   String? seenUrl; // the engine keeps the last banner; only a NEW link means a new approval is needed
+  String? blocked; // the Mac has a permission pending (Full Disk Access): no session until it is granted
   String? approveUrl; // Tailscale "check" policy: the Mac asks for a browser approval (link arrives as the SSH banner)
 
   @override
@@ -60,6 +63,20 @@ class _TerminalPageState extends State<TerminalPage> {
       final m = RegExp(r'https://\S+').firstMatch(b);
       if (m != null && seenUrl != m.group(0)) { debugPrint('APPROVEURL ${m.group(0)}'); seenUrl = m.group(0); setState(() { approveUrl = m.group(0); status = 'waiting for approval'; }); }
     });
+    // The helper on the Mac writes perms.json; while Full Disk Access is still pending, phone programs would hit permission dialogs
+    // nobody can click, so do not start a session at all. (If the check itself cannot run, carry on.)
+    final tmp = '${(await getTemporaryDirectory()).path}/perms.json';
+    final chk = await Engine.fetch('${widget.ip}:22', widget.user, pin, r'cat "$HOME/Library/Application Support/Remote Wake/perms.json"', tmp);
+    if (!mounted) { bt.cancel(); return; }
+    if (chk.isEmpty || chk.contains('exited with status')) {
+      final ok = chk.isEmpty && RegExp(r'"disk"\s*:\s*true').hasMatch(await File(tmp).readAsString());
+      if (!ok) {
+        bt.cancel();
+        setState(() { approveUrl = null; blocked = chk.isEmpty ? 'This Mac is waiting for you to allow Full Disk Access.' : 'Remote Wake is not set up on this Mac yet.'; status = 'blocked'; });
+        return;
+      }
+    }
+    if (blocked != null) setState(() => blocked = null);
     final r = await Engine.shellOpen('${widget.ip}:22', widget.user, pin, term.viewWidth, term.viewHeight);
     bt.cancel();
     if (!mounted) { if (r > 0) Engine.shellClose(r); return; }
@@ -191,6 +208,7 @@ class _TerminalPageState extends State<TerminalPage> {
     if (status.startsWith('connected')) return ('Connected', s.accent);
     if (status.startsWith('failed') || status == 'disconnected' || status == 'host key changed') return (status.startsWith('failed') ? 'Failed' : (status == 'disconnected' ? 'Disconnected' : 'Key changed'), s.danger);
     if (status == 'session ended') return ('Ended', s.muted);
+    if (status == 'blocked') return ('Blocked', s.warn);
     if (status.startsWith('reconnecting')) return ('Reconnecting', s.warn);
     if (status == 'waiting for approval') return ('Needs approval', s.warn);
     return ('Connecting', s.muted);
@@ -249,7 +267,18 @@ class _TerminalPageState extends State<TerminalPage> {
               margin: const EdgeInsets.symmetric(horizontal: Sp.sm),
               decoration: BoxDecoration(color: s.screen, borderRadius: BorderRadius.circular(12), border: Border.all(color: s.line)),
               clipBehavior: Clip.antiAlias,
-              child: TerminalView(term, focusNode: termFocus, theme: _theme, padding: const EdgeInsets.all(Sp.sm), textStyle: const TerminalStyle(fontSize: 11), autofocus: true),
+              child: Stack(fit: StackFit.expand, children: [
+                TerminalView(term, focusNode: termFocus, theme: _theme, padding: const EdgeInsets.all(Sp.sm), textStyle: const TerminalStyle(fontSize: 11), autofocus: blocked == null),
+                if (blocked != null) Container(color: s.screen, padding: const EdgeInsets.all(Sp.xl), alignment: Alignment.center, child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.lock_outline, size: 32, color: s.warn),
+                  const SizedBox(height: Sp.md),
+                  Text(blocked!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: Sp.sm),
+                  Text('Open Remote Wake on the Mac, click Allow access and switch on "Remote Wake Menu" in the list that opens. Phone sessions stay off until then.', textAlign: TextAlign.center, style: TextStyle(color: s.muted, fontSize: 13, height: 1.5)),
+                  const SizedBox(height: Sp.lg),
+                  AsciiButton('CHECK AGAIN', onPressed: () { setState(() => status = 'connecting...'); _open(); }),
+                ])),
+              ]),
             ),
           ),
           Semantics(
@@ -259,7 +288,7 @@ class _TerminalPageState extends State<TerminalPage> {
               child: SizedBox(height: 28, child: Center(child: Icon(keysHidden ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: s.muted, size: 22))),
             ),
           ),
-          if (!keysHidden) ...[
+          if (!keysHidden && blocked == null) ...[
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.fromLTRB(Sp.sm, Sp.sm, Sp.sm, 0),
