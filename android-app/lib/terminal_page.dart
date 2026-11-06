@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:isolate';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -42,6 +43,7 @@ class _TerminalPageState extends State<TerminalPage> {
   bool reconnecting = false, gaveUp = false;
   int attempt = 0;
   String? seenUrl; // the engine keeps the last banner; only a NEW link means a new approval is needed
+  bool powerDismissed = false; // the user swiped the battery warning away; it returns after the Mac has been plugged in and unplugged again
   String? powerWarn; // the Mac is running on battery
   Timer? powerT;
   String? blocked; // the Mac has a permission pending (Full Disk Access): no session until it is granted
@@ -226,7 +228,9 @@ class _TerminalPageState extends State<TerminalPage> {
     if (r.isNotEmpty || !mounted) return;
     final o = await File(tmp).readAsString();
     final pct = RegExp(r'(\d+)%').firstMatch(o)?.group(1);
-    setState(() => powerWarn = o.contains('Battery Power') ? 'Your Mac is on battery${pct != null ? ' ($pct%)' : ''}. If it runs out it shuts down and cannot be reached until someone plugs it in.' : null);
+    final onBatt = o.contains('Battery Power');
+    if (!onBatt) powerDismissed = false;
+    setState(() => powerWarn = onBatt && !powerDismissed ? 'Your Mac is on battery${pct != null ? ' ($pct%)' : ''}. If it runs out it shuts down and cannot be reached until someone plugs it in.' : null);
   }
 
   @override
@@ -272,7 +276,22 @@ class _TerminalPageState extends State<TerminalPage> {
               action: FilledButton(style: FilledButton.styleFrom(backgroundColor: s.pink, foregroundColor: s.bg), onPressed: () => launchUrl(Uri.parse(approveUrl!), mode: LaunchMode.externalApplication), child: const Text('Approve')),
             ),
           if (powerWarn != null)
-            Banner2(bg: s.warnBg, fg: s.warn, text: powerWarn!, lead: Icon(Icons.battery_alert, size: 18, color: s.warn)),
+            Dismissible(
+              key: const ValueKey('powerWarn'),
+              direction: DismissDirection.horizontal,
+              onDismissed: (_) => setState(() { powerDismissed = true; powerWarn = null; }),
+              // a short side-to-side nudge when it appears shows that it moves
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 1), duration: const Duration(milliseconds: 1100), curve: Curves.linear,
+                builder: (_, v, child) => Transform.translate(offset: Offset(math.sin(v * math.pi * 4) * 14 * (1 - v), 0), child: child),
+                child: Banner2(
+                  bg: s.warnBg, fg: s.warn, text: powerWarn!, lead: Icon(Icons.battery_alert, size: 18, color: s.warn),
+                  hint: '‹  swipe to dismiss  ›',
+                  action: IconButton(tooltip: 'Dismiss', visualDensity: VisualDensity.compact, icon: Icon(Icons.close, size: 18, color: s.warn),
+                      onPressed: () => setState(() { powerDismissed = true; powerWarn = null; })),
+                ),
+              ),
+            ),
           if (reconnecting)
             Banner2(
               bg: s.warnBg, fg: s.warn, text: gaveUp ? 'Connection lost' : 'Connection lost, reconnecting...',

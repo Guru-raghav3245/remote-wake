@@ -95,7 +95,8 @@ class Banner2 extends StatelessWidget {
   final Widget? lead;
   final String text;
   final Widget? action;
-  const Banner2({super.key, required this.bg, required this.fg, required this.text, this.lead, this.action});
+  final String? hint; // small second line, e.g. how to dismiss the banner
+  const Banner2({super.key, required this.bg, required this.fg, required this.text, this.lead, this.action, this.hint});
   @override
   Widget build(BuildContext c) => Container(
         margin: const EdgeInsets.fromLTRB(Sp.md, Sp.sm, Sp.md, 0),
@@ -103,7 +104,10 @@ class Banner2 extends StatelessWidget {
         decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
         child: Row(children: [
           if (lead != null) ...[lead!, const SizedBox(width: Sp.md)],
-          Expanded(child: Text(text, style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w600, height: 1.4))),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(text, style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w600, height: 1.4)),
+            if (hint != null) Padding(padding: const EdgeInsets.only(top: Sp.xs), child: Text(hint!, style: TextStyle(color: fg.withValues(alpha: .65), fontSize: 11, height: 1.3))),
+          ])),
           if (action != null) ...[const SizedBox(width: Sp.md), action!],
         ]),
       );
