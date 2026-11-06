@@ -58,7 +58,8 @@ class _TutorialPageState extends State<TutorialPage> {
     final s = c.sage, url = st['authUrl'] as String? ?? '';
     final signedIn = st['state'] == 'Running';
     final macs = ((st['peers'] as List?) ?? []).cast<Map>().where((p) => p['online'] == true && p['os'] == 'macOS').toList();
-    final done = [signedIn, battery, macs.isNotEmpty];
+    var ok = true; // a step only ticks once every step before it is done
+    final done = [for (final r in [signedIn, battery, macs.isNotEmpty]) ok = ok && r];
     final cur = done.indexOf(false);
     const tips = [
       (Icons.schedule, 'About every 12 hours Tailscale asks you to approve a connection in the browser. Tap Approve when the banner shows.'),
@@ -108,7 +109,7 @@ class _TutorialPageState extends State<TutorialPage> {
           ),
         ])),
         const SizedBox(height: Sp.xl),
-        Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => Navigator.pop(c), child: Text(cur == -1 ? 'Close' : 'Skip for now'))),
+        if (cur == -1) Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close'))),
         Center(child: FutureBuilder<String>(future: Native.version(), builder: (_, v) => Text(v.hasData ? 'v${v.data}' : '', style: const TextStyle(fontSize: 9, color: Colors.white38)))),
       ]),
     );

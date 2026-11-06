@@ -452,8 +452,11 @@ struct StepRow<A: View>: View {
 
 struct SetupView: View {
     @ObservedObject var m: Model
-    var skip: () -> Void
-    var done: [Bool] { [m.ready, m.tsState == "Running", m.running] + (m.needsPerms ? [m.permsOK] : []) }
+    // A step only ticks once every step before it is done, so the order stays in check even if a later one is already true.
+    var done: [Bool] {
+        var ok = true
+        return ([m.ready, m.tsState == "Running", m.running] + (m.needsPerms ? [m.permsOK] : [])).map { ok = ok && $0; return ok }
+    }
     var cur: Int { done.firstIndex(of: false) ?? -1 }
     var body: some View {
         VStack(alignment: .leading, spacing: S.lg) {
@@ -473,12 +476,11 @@ struct SetupView: View {
                     AsciiButton("KEEP MY MAC AWAKE") { m.toggle() }.disabled(m.busy)
                 }
                 if m.needsPerms {
-                    StepRow(n: 4, title: "Allow phone access", text: permText, done: m.permsOK, active: cur == 3) {
+                    StepRow(n: 4, title: "Allow phone access", text: permText, done: done[3], active: cur == 3) {
                         AsciiButton("ALLOW ACCESS") { m.grantAccess() }
                     }
                 }
             }.card()
-            HStack { Spacer(); Button("Skip setup") { skip() }.buttonStyle(Quiet()) }
         }
     }
 }
@@ -644,7 +646,7 @@ struct MainView: View {
                 Button("Help") { help = true }.buttonStyle(Quiet())
             }
             if !setupDone {
-                SetupView(m: m) { setupDone = true }.frame(maxWidth: 560).frame(maxWidth: .infinity)
+                SetupView(m: m).frame(maxWidth: 560).frame(maxWidth: .infinity)
             } else {
                 HStack(alignment: .top, spacing: S.lg) {
                     VStack(spacing: S.lg) { Hero(m: m); PhoneCard(m: m); PermsCard(m: m) }.frame(width: 540)

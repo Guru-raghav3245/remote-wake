@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -129,35 +133,35 @@ class ViewerPage extends StatefulWidget {
 }
 
 class _ViewerPageState extends State<ViewerPage> {
-  VideoPlayerController? vc;
   String? text;
+  bool loaded = false, full = false;
 
   @override
   void initState() {
     super.initState();
     final e = _ext(widget.name);
-    if (_vid.contains(e)) {
-      vc = VideoPlayerController.file(widget.file)..initialize().then((_) { if (mounted) setState(() {}); vc!.play(); });
-    } else if (_md.contains(e) || _txt.contains(e) || e.isEmpty) {
-      widget.file.readAsString().then((t) { if (mounted) setState(() => text = t); }).catchError((_) { if (mounted) setState(() => text = null); });
-    }
+    if (!_vid.contains(e) && !_img.contains(e)) _loadText();
   }
 
-  @override
-  void dispose() { vc?.dispose(); super.dispose(); }
+  // Any file that is not an image or video is shown as text when it has no NUL bytes (so .txt and unknown extensions both open).
+  Future<void> _loadText() async {
+    try {
+      final raf = await widget.file.open();
+      final b = await raf.read(2 * 1024 * 1024); // first 2 MB is plenty on a phone
+      final more = await raf.length() > b.length;
+      await raf.close();
+      if (b.contains(0)) { if (mounted) setState(() => loaded = true); return; }
+      final t = utf8.decode(b, allowMalformed: true) + (more ? '\n\n[... file continues; showing the first 2 MB]' : '');
+      if (mounted) setState(() { text = t; loaded = true; });
+    } catch (_) { if (mounted) setState(() => loaded = true); }
+  }
 
   @override
   Widget build(BuildContext c) {
     final s = c.sage, e = _ext(widget.name);
     Widget body;
-    if (vc != null) {
-      body = vc!.value.isInitialized
-          ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              AspectRatio(aspectRatio: vc!.value.aspectRatio, child: VideoPlayer(vc!)),
-              VideoProgressIndicator(vc!, allowScrubbing: true, colors: VideoProgressColors(playedColor: s.accent)),
-              IconButton(iconSize: 40, color: s.accent, icon: Icon(vc!.value.isPlaying ? Icons.pause : Icons.play_arrow), onPressed: () => setState(() => vc!.value.isPlaying ? vc!.pause() : vc!.play())),
-            ])
-          : Center(child: CircularProgressIndicator(color: s.accent));
+    if (_vid.contains(e)) {
+      body = VideoView(file: widget.file, onFull: (f) => setState(() => full = f));
     } else if (_img.contains(e)) {
       body = InteractiveViewer(child: Center(child: Image.file(widget.file)));
     } else if (text != null) {
@@ -166,13 +170,15 @@ class _ViewerPageState extends State<ViewerPage> {
               p: const TextStyle(fontSize: 14, height: 1.5), code: TextStyle(fontFamily: mono, fontSize: 12, backgroundColor: s.soft),
               codeblockDecoration: BoxDecoration(color: s.card, borderRadius: BorderRadius.circular(10), border: Border.all(color: s.line)),
               blockquoteDecoration: BoxDecoration(border: Border(left: BorderSide(color: s.accent, width: 3)))))
-          : SingleChildScrollView(padding: const EdgeInsets.all(Sp.lg), scrollDirection: Axis.vertical,
-              child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: SelectableText(text!, style: const TextStyle(fontFamily: mono, fontSize: 12, height: 1.4))));
+          : SingleChildScrollView(padding: const EdgeInsets.all(Sp.lg), child: SelectableText(text!, style: const TextStyle(fontFamily: mono, fontSize: 12, height: 1.4)));
+    } else if (!loaded) {
+      body = Center(child: CircularProgressIndicator(color: s.accent));
     } else {
       body = Center(child: Padding(padding: const EdgeInsets.all(Sp.xl), child: Text('No preview for this file type. Use Save or Share.', textAlign: TextAlign.center, style: TextStyle(color: s.muted))));
     }
     return Scaffold(
-      appBar: AppBar(
+      backgroundColor: full ? Colors.black : null,
+      appBar: full ? null : AppBar(
         titleSpacing: 0,
         title: Text(widget.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
         actions: [
@@ -184,7 +190,127 @@ class _ViewerPageState extends State<ViewerPage> {
           IconButton(tooltip: 'Share', icon: Icon(Icons.ios_share, color: s.muted), onPressed: () => Share.shareXFiles([XFile(widget.file.path)])),
         ],
       ),
-      body: SafeArea(child: body),
+      body: SafeArea(top: !full, bottom: !full, child: body),
     );
+  }
+}
+
+String _t(Duration d) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return d.inHours > 0 ? '${d.inHours}:${two(d.inMinutes % 60)}:${two(d.inSeconds % 60)}' : '${two(d.inMinutes)}:${two(d.inSeconds % 60)}';
+}
+
+// VLC-style player: tap to show/hide the controls, double-tap the left/right half to jump 10 s, time + seek bar, play speed,
+// mute, and a full-screen (landscape, no system bars) toggle.
+class VideoView extends StatefulWidget {
+  final File file;
+  final void Function(bool) onFull;
+  const VideoView({super.key, required this.file, required this.onFull});
+  @override
+  State<VideoView> createState() => _VideoViewState();
+}
+
+class _VideoViewState extends State<VideoView> {
+  late final VideoPlayerController v;
+  bool show = true, full = false, muted = false, drag = false;
+  double speed = 1, dragMs = 0;
+  Timer? hide;
+  String? flash; // "-10 s" / "+10 s" feedback after a double tap
+  Timer? flashT;
+
+  @override
+  void initState() {
+    super.initState();
+    v = VideoPlayerController.file(widget.file)..addListener(() { if (mounted) setState(() {}); });
+    v.initialize().then((_) { if (mounted) { setState(() {}); v.play(); _arm(); } });
+  }
+
+  @override
+  void dispose() {
+    hide?.cancel(); flashT?.cancel(); v.dispose();
+    if (full) _setFull(false);
+    super.dispose();
+  }
+
+  void _arm() { hide?.cancel(); hide = Timer(const Duration(seconds: 3), () { if (mounted && v.value.isPlaying && !drag) setState(() => show = false); }); }
+
+  void _setFull(bool f) {
+    SystemChrome.setPreferredOrientations(f ? [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight] : []);
+    SystemChrome.setEnabledSystemUIMode(f ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge);
+  }
+
+  void _toggleFull() { full = !full; _setFull(full); widget.onFull(full); setState(() {}); _arm(); }
+
+  void _seekBy(int sec) {
+    final d = v.value.duration.inMilliseconds, p = v.value.position.inMilliseconds + sec * 1000;
+    v.seekTo(Duration(milliseconds: p.clamp(0, d)));
+    flashT?.cancel();
+    setState(() => flash = sec < 0 ? '$sec s' : '+$sec s');
+    flashT = Timer(const Duration(milliseconds: 700), () { if (mounted) setState(() => flash = null); });
+  }
+
+  void _playPause() { v.value.isPlaying ? v.pause() : v.play(); setState(() => show = true); _arm(); }
+
+  @override
+  Widget build(BuildContext c) {
+    final s = c.sage;
+    if (!v.value.isInitialized) return Center(child: v.value.hasError ? Text('Cannot play this video', style: TextStyle(color: s.danger)) : CircularProgressIndicator(color: s.accent));
+    final dur = v.value.duration, pos = drag ? Duration(milliseconds: dragMs.round()) : v.value.position;
+    final maxMs = math.max(1.0, dur.inMilliseconds.toDouble());
+    Widget icon(IconData i, VoidCallback f, {double size = 28}) => IconButton(iconSize: size, color: Colors.white, icon: Icon(i), onPressed: () { f(); _arm(); });
+    return Stack(fit: StackFit.expand, children: [
+      Container(color: Colors.black),
+      Center(child: AspectRatio(aspectRatio: v.value.aspectRatio, child: VideoPlayer(v))),
+      // tap = controls, double tap left/right half = -/+ 10 s
+      Row(children: [
+        for (final back in [true, false])
+          Expanded(child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () { setState(() => show = !show); if (show) _arm(); },
+            onDoubleTap: () => _seekBy(back ? -10 : 10),
+          )),
+      ]),
+      if (flash != null) Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: Sp.lg, vertical: Sp.sm), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)), child: Text(flash!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)))),
+      if (show) ...[
+        Center(child: Row(mainAxisSize: MainAxisSize.min, children: [
+          icon(Icons.replay_10, () => _seekBy(-10), size: 36),
+          const SizedBox(width: Sp.lg),
+          Container(decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle), child: icon(v.value.isPlaying ? Icons.pause : Icons.play_arrow, _playPause, size: 48)),
+          const SizedBox(width: Sp.lg),
+          icon(Icons.forward_10, () => _seekBy(10), size: 36),
+        ])),
+        Positioned(left: 0, right: 0, bottom: 0, child: Container(
+          decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black87, Colors.transparent])),
+          padding: const EdgeInsets.fromLTRB(Sp.md, Sp.xl, Sp.sm, Sp.sm),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Row(children: [
+              Text(_t(pos), style: const TextStyle(color: Colors.white, fontSize: 12)),
+              Expanded(child: SliderTheme(
+                data: SliderTheme.of(c).copyWith(trackHeight: 3, activeTrackColor: s.accent, thumbColor: s.accent, inactiveTrackColor: Colors.white24, overlayShape: SliderComponentShape.noOverlay),
+                child: Slider(
+                  min: 0, max: maxMs, value: (drag ? dragMs : v.value.position.inMilliseconds.toDouble()).clamp(0, maxMs),
+                  onChangeStart: (x) { drag = true; dragMs = x; hide?.cancel(); },
+                  onChanged: (x) => setState(() => dragMs = x),
+                  onChangeEnd: (x) { v.seekTo(Duration(milliseconds: x.round())); setState(() => drag = false); _arm(); },
+                ),
+              )),
+              Text(_t(dur), style: const TextStyle(color: Colors.white, fontSize: 12)),
+            ]),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              PopupMenuButton<double>(
+                tooltip: 'Playback speed', initialValue: speed, color: s.card,
+                onSelected: (x) { setState(() => speed = x); v.setPlaybackSpeed(x); _arm(); },
+                itemBuilder: (_) => [for (final x in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]) PopupMenuItem(value: x, child: Text('${x}x'))],
+                child: Padding(padding: const EdgeInsets.symmetric(horizontal: Sp.md, vertical: Sp.sm), child: Text('${speed}x', style: TextStyle(color: s.accent, fontWeight: FontWeight.w700))),
+              ),
+              Row(children: [
+                icon(muted ? Icons.volume_off : Icons.volume_up, () { setState(() => muted = !muted); v.setVolume(muted ? 0 : 1); }, size: 22),
+                icon(full ? Icons.fullscreen_exit : Icons.fullscreen, _toggleFull, size: 26),
+              ]),
+            ]),
+          ]),
+        )),
+      ],
+    ]);
   }
 }
