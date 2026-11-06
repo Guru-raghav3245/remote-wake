@@ -503,7 +503,7 @@ struct Hero: View {
     var phoneOnline: Bool { m.phones.first.map { !$0.hasSuffix("(offline)") } ?? false }
     var body: some View {
         VStack(alignment: .leading, spacing: S.md) {
-            AsciiWord(grid: word(info.0), color: info.1)
+            AsciiWord(grid: word(info.0), color: info.1).id(info.0).transition(.opacity)
             PathLine(live: m.running && m.holding && phoneOnline, phoneOnline: phoneOnline, macWord: m.running && m.holding ? "awake" : "asleep")
             HStack(alignment: .center, spacing: S.lg) {
                 if !m.running { AsciiButton("KEEP MY MAC AWAKE") { m.toggle() }.disabled(m.busy) }
@@ -665,6 +665,8 @@ struct MainView: View {
             if let e = m.error { Text(e).font(ff(13)).foregroundStyle(T.warn).padding(S.md).frame(maxWidth: .infinity, alignment: .leading).background(T.warnBg, in: RoundedRectangle(cornerRadius: 8)) }
         }
         .padding(S.xl).frame(width: 884).background(T.bg)
+        // a state change (awake/asleep, plugged in, steps ticking, phone online...) fades and eases instead of snapping
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: "\(m.running)\(m.holding)\(m.onAC)\(m.tsState)\(m.phoneOn)\(m.permsOK)\(m.ready)\(m.phones.first ?? "")\(setupDone)")
         .onChange(of: allDone) { if $0 { setupDone = true } }
         .onAppear { if allDone { setupDone = true } }
         .sheet(isPresented: $help) { HelpSheet { help = false } }

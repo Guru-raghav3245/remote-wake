@@ -68,10 +68,11 @@ class StatusWord extends StatelessWidget {
   final Color color;
   const StatusWord(this.word, this.color, {super.key});
   @override
+  // a state change fades the word and eases the dot's colour instead of snapping
   Widget build(BuildContext c) => Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withValues(alpha: .7), blurRadius: 8)])),
+        AnimatedContainer(duration: const Duration(milliseconds: 350), width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withValues(alpha: .7), blurRadius: 8)])),
         const SizedBox(width: Sp.sm),
-        Text(word, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
+        AnimatedSwitcher(duration: const Duration(milliseconds: 300), child: Text(word, key: ValueKey(word), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color))),
       ]);
 }
 

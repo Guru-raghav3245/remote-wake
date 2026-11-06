@@ -106,11 +106,10 @@ class _HomeState extends State<Home> {
     return Column(children: [
       AsciiLaptop(mode),
       const SizedBox(height: Sp.md),
-      Text(word, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: 3, color: col)),
-      if (running && macs.isNotEmpty && !online) ...[
-        const SizedBox(height: Sp.sm),
-        Text('Your Mac is not reachable. Open Remote Wake on it and turn on stay awake.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, height: 1.4, color: s.danger)),
-      ],
+      AnimatedSwitcher(duration: const Duration(milliseconds: 350), child: Text(word, key: ValueKey(word), style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: 3, color: col))),
+      AnimatedSize(duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic, alignment: Alignment.topCenter, child: running && macs.isNotEmpty && !online
+          ? Padding(padding: const EdgeInsets.only(top: Sp.sm), child: Text('Your Mac is not reachable. Open Remote Wake on it and turn on stay awake.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, height: 1.4, color: s.danger)))
+          : const SizedBox(width: double.infinity)),
     ]);
   }
 
@@ -151,7 +150,8 @@ class _HomeState extends State<Home> {
 
   Widget _computer(BuildContext c, Map p) {
     final s = c.sage, online = p['online'] == true;
-    return Opacity(
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 350),
       opacity: online ? 1 : .6,
       child: AppCard(
         onTap: online && !edit ? () => _open(p) : null,
@@ -197,6 +197,8 @@ class _HomeState extends State<Home> {
             if (all.isNotEmpty) TextButton(style: TextButton.styleFrom(minimumSize: const Size(48, 32), padding: const EdgeInsets.symmetric(horizontal: Sp.sm)), onPressed: () => setState(() => edit = !edit), child: Text(edit ? 'Done' : 'Edit')),
           ]),
           const SizedBox(height: Sp.md),
+          // computers appearing, going offline or being removed ease in and out
+          AnimatedSize(duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic, alignment: Alignment.topCenter, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (peers.isEmpty)
             AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('No computers yet', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
@@ -230,6 +232,7 @@ class _HomeState extends State<Home> {
               TextButton(onPressed: () => _setHidden('${p['ip']}', false), child: const Text('Restore')),
             ]))),
           ],
+          ])),
         ],
       ]),
     );

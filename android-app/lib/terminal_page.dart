@@ -254,13 +254,13 @@ class _TerminalPageState extends State<TerminalPage> {
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Tooltip(message: '${widget.user}@${widget.ip}', child: Text(widget.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
           const SizedBox(height: 2),
-          Row(mainAxisSize: MainAxisSize.min, children: [
+          AnimatedSize(duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic, alignment: Alignment.centerLeft, child: Row(mainAxisSize: MainAxisSize.min, children: [
             StatusWord(tone.$1, tone.$2, key: const Key('tstatus')),
             if (onBattery && status.startsWith('connected')) ...[
               Text('  ·  ', style: TextStyle(fontSize: 13, color: s.muted)),
               Flexible(child: Text('Not charging', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: s.warn))),
             ],
-          ]),
+          ])),
         ]),
         actions: [
           IconButton(
@@ -278,6 +278,8 @@ class _TerminalPageState extends State<TerminalPage> {
       ),
       body: SafeArea(
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          // banners slide open and shut instead of popping in
+          AnimatedSize(duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic, alignment: Alignment.topCenter, child: Column(children: [
           if (approveUrl != null)
             Banner2(
               bg: s.pinkBg, fg: s.pink, text: 'Tailscale needs you to approve this connection (about every 12 hours).',
@@ -305,6 +307,7 @@ class _TerminalPageState extends State<TerminalPage> {
               lead: gaveUp ? null : SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: s.warn)),
               action: gaveUp ? FilledButton(style: FilledButton.styleFrom(backgroundColor: s.warn, foregroundColor: s.bg), onPressed: () { attempt = 0; _reconnect(); }, child: const Text('Retry')) : null,
             ),
+          ])),
           const SizedBox(height: Sp.sm),
           Expanded(
             child: Container(
@@ -313,7 +316,7 @@ class _TerminalPageState extends State<TerminalPage> {
               clipBehavior: Clip.antiAlias,
               child: Stack(fit: StackFit.expand, children: [
                 TerminalView(term, focusNode: termFocus, theme: _theme, padding: const EdgeInsets.all(Sp.sm), textStyle: const TerminalStyle(fontSize: 11), autofocus: blocked == null),
-                if (blocked != null) Container(color: s.screen, padding: const EdgeInsets.all(Sp.xl), alignment: Alignment.center, child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Positioned.fill(child: AnimatedSwitcher(duration: const Duration(milliseconds: 300), child: blocked == null ? const SizedBox.shrink() : Container(key: const ValueKey('blocked'), color: s.screen, padding: const EdgeInsets.all(Sp.xl), alignment: Alignment.center, child: Column(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.lock_outline, size: 32, color: s.warn),
                   const SizedBox(height: Sp.md),
                   Text(blocked!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
@@ -321,7 +324,7 @@ class _TerminalPageState extends State<TerminalPage> {
                   Text('Open Remote Wake on the Mac, click Allow access and switch on "Remote Wake Menu" in the list that opens. Phone sessions stay off until then.', textAlign: TextAlign.center, style: TextStyle(color: s.muted, fontSize: 13, height: 1.5)),
                   const SizedBox(height: Sp.lg),
                   AsciiButton('CHECK AGAIN', onPressed: () { setState(() => status = 'connecting...'); _open(); }),
-                ])),
+                ])))),
               ]),
             ),
           ),
