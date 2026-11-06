@@ -286,7 +286,6 @@ class _TerminalPageState extends State<TerminalPage> {
                 builder: (_, v, child) => Transform.translate(offset: Offset(math.sin(v * math.pi * 4) * 14 * (1 - v), 0), child: child),
                 child: Banner2(
                   bg: s.warnBg, fg: s.warn, text: powerWarn!, lead: Icon(Icons.battery_alert, size: 18, color: s.warn),
-                  hint: '‹  swipe to dismiss  ›',
                   action: IconButton(tooltip: 'Dismiss', visualDensity: VisualDensity.compact, icon: Icon(Icons.close, size: 18, color: s.warn),
                       onPressed: () => setState(() { powerDismissed = true; powerWarn = null; })),
                 ),
