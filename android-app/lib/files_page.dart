@@ -92,14 +92,14 @@ class _FilesPageState extends State<FilesPage> {
       ),
       body: SafeArea(
         child: Column(children: [
-          if (busy) LinearProgressIndicator(color: s.accent, backgroundColor: s.line, minHeight: 2),
-          if (err != null) Padding(padding: const EdgeInsets.all(Sp.lg), child: Text(err!, style: TextStyle(color: s.danger))),
-          Expanded(child: ListView(children: [
+          Appear(child: busy ? LinearProgressIndicator(key: const ValueKey('bar'), color: s.accent, backgroundColor: s.line, minHeight: 2) : null),
+          Appear(child: err != null ? Padding(key: ValueKey(err), padding: const EdgeInsets.all(Sp.lg), child: Text(err!, style: TextStyle(color: s.danger))) : null),
+          Expanded(child: AnimatedSwitcher(duration: const Duration(milliseconds: 220), child: ListView(key: ValueKey(dir), children: [
             if (dir.isNotEmpty && dir != '/') _row(s, Icons.arrow_upward, '..', () => _list('$dir/..')),
             for (final it in items)
               _row(s, it.$2 ? Icons.folder_outlined : _icon(it.$1), it.$1, () => it.$2 ? _list(dir == '/' ? '/${it.$1}' : '$dir/${it.$1}') : _open(it.$1), dim: it.$1.startsWith('.')),
             if (!busy && items.isEmpty && err == null) Padding(padding: const EdgeInsets.all(Sp.lg), child: Text('Empty folder', style: TextStyle(color: s.muted))),
-          ])),
+          ]))),
         ]),
       ),
     );
@@ -247,6 +247,7 @@ class _VideoViewState extends State<VideoView> {
   double speed = 1, dragMs = 0;
   Timer? hide;
   String? flash; // "-10 s" / "+10 s" feedback after a double tap
+  String lastFlash = ''; // kept so the text does not vanish while it fades out
   Timer? flashT;
 
   @override
@@ -276,7 +277,7 @@ class _VideoViewState extends State<VideoView> {
     final d = v.value.duration.inMilliseconds, p = v.value.position.inMilliseconds + sec * 1000;
     v.seekTo(Duration(milliseconds: p.clamp(0, d)));
     flashT?.cancel();
-    setState(() => flash = sec < 0 ? '$sec s' : '+$sec s');
+    setState(() => lastFlash = flash = sec < 0 ? '$sec s' : '+$sec s');
     flashT = Timer(const Duration(milliseconds: 700), () { if (mounted) setState(() => flash = null); });
   }
 
@@ -301,8 +302,8 @@ class _VideoViewState extends State<VideoView> {
             onDoubleTap: () => _seekBy(back ? -10 : 10),
           )),
       ]),
-      if (flash != null) Align(alignment: const Alignment(0, 0.4), child: Container(padding: const EdgeInsets.symmetric(horizontal: Sp.lg, vertical: Sp.sm), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)), child: Text(flash!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)))),
-      if (show) ...[
+      Align(alignment: const Alignment(0, 0.4), child: IgnorePointer(child: AnimatedOpacity(opacity: flash != null ? 1 : 0, duration: const Duration(milliseconds: 160), child: Container(padding: const EdgeInsets.symmetric(horizontal: Sp.lg, vertical: Sp.sm), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)), child: Text(flash ?? lastFlash, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)))))),
+      Positioned.fill(child: IgnorePointer(ignoring: !show, child: AnimatedOpacity(opacity: show ? 1 : 0, duration: const Duration(milliseconds: 220), child: Stack(fit: StackFit.expand, children: [
         Center(child: Row(mainAxisSize: MainAxisSize.min, children: [
           icon(Icons.replay_10, () => _seekBy(-10), size: 36),
           const SizedBox(width: Sp.lg),
@@ -341,7 +342,7 @@ class _VideoViewState extends State<VideoView> {
             ]),
           ]),
         )),
-      ],
+      ])))),
     ]);
   }
 }

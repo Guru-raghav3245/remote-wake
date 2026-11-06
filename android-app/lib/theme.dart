@@ -231,3 +231,18 @@ class _AsciiLaptopState extends State<AsciiLaptop> with _Anim<AsciiLaptop> {
     );
   }
 }
+
+// Things that come and go ease in and out instead of popping: Appear(child: cond ? widget : null) slides the space open and fades the
+// widget; Swap(text) cross-fades when the text changes.
+class Appear extends StatelessWidget {
+  final Widget? child;
+  const Appear({super.key, this.child});
+  @override
+  Widget build(BuildContext c) => AnimatedSize(
+        duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic, alignment: Alignment.topCenter,
+        child: AnimatedSwitcher(duration: const Duration(milliseconds: 260), child: child ?? const SizedBox(key: ValueKey('none'), width: double.infinity)),
+      );
+}
+
+Widget swapText(String t, TextStyle style, {TextAlign? align}) =>
+    AnimatedSwitcher(duration: const Duration(milliseconds: 260), child: Text(t, key: ValueKey(t), style: style, textAlign: align));

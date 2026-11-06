@@ -38,16 +38,17 @@ class _TutorialPageState extends State<TutorialPage> {
         Container(
           width: 28, height: 28, alignment: Alignment.center,
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: done ? s.accent : (active ? s.soft : null), border: done ? null : Border.all(color: active ? s.accent : s.line)),
-          child: done ? Icon(Icons.check, size: 16, color: s.onAccent) : Text('$n', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: active ? s.accent : s.muted)),
+          child: AnimatedSwitcher(duration: const Duration(milliseconds: 260), transitionBuilder: (w, a) => ScaleTransition(scale: a, child: FadeTransition(opacity: a, child: w)),
+              child: done ? Icon(Icons.check, key: const ValueKey('ok'), size: 16, color: s.onAccent) : Text('$n', key: ValueKey('n$n'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: active ? s.accent : s.muted))),
         ),
         const SizedBox(width: Sp.md),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Padding(padding: const EdgeInsets.only(top: Sp.xs), child: Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: done || active ? s.text : s.muted))),
-          if (active) ...[
+          Appear(child: active ? Column(key: ValueKey('open$n'), crossAxisAlignment: CrossAxisAlignment.start, children: [
             const SizedBox(height: Sp.sm),
             Text(body, style: TextStyle(color: s.muted, fontSize: 13, height: 1.4)),
             if (action != null) ...[const SizedBox(height: Sp.md), action],
-          ],
+          ]) : null),
         ])),
       ]),
     );
@@ -80,6 +81,7 @@ class _TutorialPageState extends State<TutorialPage> {
               AsciiButton('Allow', onPressed: () async { await Store.setAskedBattery(); await Native.batteryExempt(); if (mounted) setState(() => battery = true); })),
           _step(c, 3, 'Find your Mac', 'On the Mac, open Remote Wake and finish its setup. It shows up here by itself.', done[2], cur == 2),
         ])),
+        AnimatedSize(duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic, alignment: Alignment.topCenter, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (macs.isNotEmpty) ...[
           const SizedBox(height: Sp.xl),
           const Caption('Your Mac is ready'),
@@ -95,6 +97,7 @@ class _TutorialPageState extends State<TutorialPage> {
               ]),
             ),
         ],
+        ])),
         const SizedBox(height: Sp.xl),
         const Caption('Good to know'),
         const SizedBox(height: Sp.md),
@@ -109,7 +112,7 @@ class _TutorialPageState extends State<TutorialPage> {
           ),
         ])),
         const SizedBox(height: Sp.xl),
-        if (cur == -1) Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close'))),
+        Appear(child: cur == -1 ? Align(key: const ValueKey('close'), alignment: Alignment.centerRight, child: TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close'))) : null),
         Center(child: FutureBuilder<String>(future: Native.version(), builder: (_, v) => Text(v.hasData ? 'v${v.data}' : '', style: const TextStyle(fontSize: 9, color: Colors.white38)))),
       ]),
     );

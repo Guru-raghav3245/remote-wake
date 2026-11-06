@@ -87,10 +87,10 @@ class _HomeState extends State<Home> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         StatusWord(running ? 'Connected' : (needsLogin ? 'Sign-in needed' : 'Starting'), running ? s.accent : (needsLogin ? s.warn : s.muted)),
         const SizedBox(height: Sp.sm),
-        Text(running ? 'Tailscale is on' : (needsLogin ? 'Sign in to Tailscale' : 'Starting Tailscale'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+        swapText(running ? 'Tailscale is on' : (needsLogin ? 'Sign in to Tailscale' : 'Starting Tailscale'), const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
         const SizedBox(height: Sp.xs),
-        Text(running ? ip : (needsLogin ? 'Use the same account as on your Mac.' : 'This takes a few seconds.'), style: TextStyle(color: s.muted, fontSize: 13, height: 1.4)),
-        if (needsLogin && !running) ...[const SizedBox(height: Sp.md), AsciiButton('Sign in', onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication))],
+        swapText(running ? ip : (needsLogin ? 'Use the same account as on your Mac.' : 'This takes a few seconds.'), TextStyle(color: s.muted, fontSize: 13, height: 1.4)),
+        Appear(child: needsLogin && !running ? Padding(key: const ValueKey('signin'), padding: const EdgeInsets.only(top: Sp.md), child: AsciiButton('Sign in', onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication))) : null),
       ]),
     );
   }
@@ -163,8 +163,9 @@ class _HomeState extends State<Home> {
             const SizedBox(height: Sp.xs),
             StatusWord(online ? 'Online' : 'Offline${_ago(p['seen'])}', online ? s.accent : s.muted),
           ])),
-          if (edit) IconButton(tooltip: 'Remove from list', icon: Icon(Icons.remove_circle_outline, color: s.danger), onPressed: () => _remove(p))
-          else if (online) Text('>', style: TextStyle(color: s.accent, fontSize: 20, fontWeight: FontWeight.w700)),
+          AnimatedSwitcher(duration: const Duration(milliseconds: 220), child: edit
+              ? IconButton(key: const ValueKey('rm'), tooltip: 'Remove from list', icon: Icon(Icons.remove_circle_outline, color: s.danger), onPressed: () => _remove(p))
+              : online ? Text('>', key: const ValueKey('go'), style: TextStyle(color: s.accent, fontSize: 20, fontWeight: FontWeight.w700)) : const SizedBox(key: ValueKey('none'))),
         ]),
       ),
     );
@@ -215,7 +216,7 @@ class _HomeState extends State<Home> {
               InkWell(
                 onTap: () => setState(() => showOff = !showOff),
                 child: Padding(padding: const EdgeInsets.symmetric(vertical: Sp.sm), child: Row(children: [
-                  Icon(showOff ? Icons.expand_less : Icons.expand_more, color: s.muted),
+                  AnimatedRotation(turns: showOff ? .5 : 0, duration: const Duration(milliseconds: 220), child: Icon(Icons.expand_more, color: s.muted)),
                   const SizedBox(width: Sp.sm),
                   Text('Not reachable (${peers.where((p) => p['online'] != true).length})', style: TextStyle(color: s.muted, fontWeight: FontWeight.w700)),
                 ])),

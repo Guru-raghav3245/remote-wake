@@ -332,9 +332,10 @@ class _TerminalPageState extends State<TerminalPage> {
             button: true, label: keysHidden ? 'Show shortcut keys' : 'Hide shortcut keys', excludeSemantics: true,
             child: InkWell(
               onTap: () { setState(() => keysHidden = !keysHidden); Store.setKeysHidden(keysHidden); },
-              child: SizedBox(height: 28, child: Center(child: Icon(keysHidden ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: s.muted, size: 22))),
+              child: SizedBox(height: 28, child: Center(child: AnimatedRotation(turns: keysHidden ? .5 : 0, duration: const Duration(milliseconds: 220), child: Icon(Icons.keyboard_arrow_down, color: s.muted, size: 22)))),
             ),
           ),
+          AnimatedSize(duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic, alignment: Alignment.topCenter, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (!keysHidden && blocked == null) ...[
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -363,6 +364,7 @@ class _TerminalPageState extends State<TerminalPage> {
               ]),
             ),
           ],
+          ])),
           const SizedBox(height: Sp.sm),
         ]),
       ),
