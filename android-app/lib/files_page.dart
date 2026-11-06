@@ -5,6 +5,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:pdfx/pdfx.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
@@ -116,11 +119,11 @@ class _FilesPageState extends State<FilesPage> {
 }
 
 String _ext(String n) => n.contains('.') ? n.split('.').last.toLowerCase() : '';
-const _md = {'md', 'markdown'}, _img = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'}, _vid = {'mp4', 'mov', 'm4v', 'webm', 'mkv'};
+const _pdf = {'pdf'}, _svg = {'svg'}, _html = {'html', 'htm'}, _aud = {'mp3', 'wav', 'm4a', 'aac', 'ogg', 'oga', 'flac', 'opus'}, _md = {'md', 'markdown'}, _img = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'}, _vid = {'mp4', 'mov', 'm4v', 'webm', 'mkv'};
 const _txt = {'txt', 'log', 'json', 'yaml', 'yml', 'toml', 'csv', 'py', 'js', 'ts', 'go', 'swift', 'dart', 'kt', 'java', 'sh', 'zsh', 'html', 'css', 'c', 'h', 'rs', 'rb', 'xml', 'ini', 'cfg', 'conf', 'env', 'sql'};
 IconData _icon(String n) {
   final e = _ext(n);
-  return _img.contains(e) ? Icons.image_outlined : _vid.contains(e) ? Icons.movie_outlined : _md.contains(e) || _txt.contains(e) ? Icons.description_outlined : Icons.insert_drive_file_outlined;
+  return _pdf.contains(e) ? Icons.picture_as_pdf_outlined : _svg.contains(e) ? Icons.image_outlined : _html.contains(e) ? Icons.language : _aud.contains(e) ? Icons.audiotrack_outlined : _img.contains(e) ? Icons.image_outlined : _vid.contains(e) ? Icons.movie_outlined : _md.contains(e) || _txt.contains(e) ? Icons.description_outlined : Icons.insert_drive_file_outlined;
 }
 
 // Shows a downloaded file: markdown rendered, text/code as plain monospace, images, video; anything else goes to the share sheet.
@@ -134,13 +137,23 @@ class ViewerPage extends StatefulWidget {
 
 class _ViewerPageState extends State<ViewerPage> {
   String? text;
-  bool loaded = false, full = false;
+  bool loaded = false, full = false, source = false; // source: show an HTML file's code instead of the page
+  PdfControllerPinch? pdf;
+  WebViewController? web;
 
   @override
   void initState() {
     super.initState();
     final e = _ext(widget.name);
-    if (!_vid.contains(e) && !_img.contains(e)) _loadText();
+    if (_pdf.contains(e)) pdf = PdfControllerPinch(document: PdfDocument.openFile(widget.file.path));
+    if (_html.contains(e)) {
+      // the page runs from the phone's copy of the file; links that leave the file (the web) are blocked
+      web = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setNavigationDelegate(NavigationDelegate(onNavigationRequest: (r) => r.url.startsWith('file:') || r.url.startsWith('about:') ? NavigationDecision.navigate : NavigationDecision.prevent))
+        ..loadFile(widget.file.path);
+    }
+    if (!_vid.contains(e) && !_img.contains(e) && !_pdf.contains(e) && !_svg.contains(e) && !_aud.contains(e)) _loadText();
   }
 
   // Any file that is not an image or video is shown as text when it has no NUL bytes (so .txt and unknown extensions both open).
@@ -157,11 +170,28 @@ class _ViewerPageState extends State<ViewerPage> {
   }
 
   @override
+  void dispose() { pdf?.dispose(); super.dispose(); }
+
+  @override
   Widget build(BuildContext c) {
     final s = c.sage, e = _ext(widget.name);
     Widget body;
     if (_vid.contains(e)) {
       body = VideoView(file: widget.file, onFull: (f) => setState(() => full = f));
+    } else if (_aud.contains(e)) {
+      body = AudioView(file: widget.file, name: widget.name);
+    } else if (pdf != null) {
+      body = PdfViewPinch(controller: pdf!, builders: PdfViewPinchBuilders<DefaultBuilderOptions>(
+        options: const DefaultBuilderOptions(),
+        documentLoaderBuilder: (_) => Center(child: CircularProgressIndicator(color: s.accent)),
+        pageLoaderBuilder: (_) => Center(child: CircularProgressIndicator(color: s.accent)),
+        errorBuilder: (_, e) => Center(child: Padding(padding: const EdgeInsets.all(Sp.xl), child: Text('Cannot open this PDF', style: TextStyle(color: s.danger)))),
+      ));
+    } else if (_svg.contains(e)) {
+      // SVGs are usually drawn for a light page, so show them on white
+      body = Container(color: Colors.white, child: InteractiveViewer(maxScale: 8, child: Center(child: SvgPicture.file(widget.file, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Text('Cannot draw this SVG', style: TextStyle(color: Colors.black54))))));
+    } else if (web != null && !source) {
+      body = WebViewWidget(controller: web!);
     } else if (_img.contains(e)) {
       body = InteractiveViewer(child: Center(child: Image.file(widget.file)));
     } else if (text != null) {
@@ -182,6 +212,7 @@ class _ViewerPageState extends State<ViewerPage> {
         titleSpacing: 0,
         title: Text(widget.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
         actions: [
+          if (web != null) IconButton(tooltip: source ? 'Show the page' : 'Show the code', icon: Icon(source ? Icons.web : Icons.code, color: s.muted), onPressed: () => setState(() => source = !source)),
           IconButton(tooltip: 'Save to phone (Downloads)', icon: Icon(Icons.download_outlined, color: s.muted), onPressed: () async {
             final m = ScaffoldMessenger.of(c);
             try { await Native.saveToDownloads(widget.file.path, widget.name); m.showSnackBar(SnackBar(content: Text('Saved to Downloads: ${widget.name}'))); }
@@ -312,5 +343,73 @@ class _VideoViewState extends State<VideoView> {
         )),
       ],
     ]);
+  }
+}
+
+// Audio player: the video player engine plays audio files too; this is just its controls.
+class AudioView extends StatefulWidget {
+  final File file;
+  final String name;
+  const AudioView({super.key, required this.file, required this.name});
+  @override
+  State<AudioView> createState() => _AudioViewState();
+}
+
+class _AudioViewState extends State<AudioView> {
+  late final VideoPlayerController v;
+  double speed = 1;
+  bool drag = false;
+  double dragMs = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    v = VideoPlayerController.file(widget.file)..addListener(() { if (mounted) setState(() {}); });
+    v.initialize().then((_) { if (mounted) { setState(() {}); v.play(); } });
+  }
+
+  @override
+  void dispose() { v.dispose(); super.dispose(); }
+
+  void _by(int sec) => v.seekTo(Duration(milliseconds: (v.value.position.inMilliseconds + sec * 1000).clamp(0, v.value.duration.inMilliseconds)));
+
+  @override
+  Widget build(BuildContext c) {
+    final s = c.sage;
+    if (!v.value.isInitialized) return Center(child: v.value.hasError ? Text('Cannot play this audio', style: TextStyle(color: s.danger)) : CircularProgressIndicator(color: s.accent));
+    final dur = v.value.duration, maxMs = math.max(1.0, dur.inMilliseconds.toDouble());
+    final posMs = (drag ? dragMs : v.value.position.inMilliseconds.toDouble()).clamp(0.0, maxMs);
+    return Padding(
+      padding: const EdgeInsets.all(Sp.xl),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Icon(Icons.audiotrack, size: 72, color: s.accent),
+        const SizedBox(height: Sp.lg),
+        Text(widget.name, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+        const SizedBox(height: Sp.xl),
+        Row(children: [
+          Text(_t(Duration(milliseconds: posMs.round())), style: TextStyle(color: s.muted, fontSize: 12)),
+          Expanded(child: Slider(
+            min: 0, max: maxMs, value: posMs, activeColor: s.accent,
+            onChangeStart: (x) { drag = true; dragMs = x; },
+            onChanged: (x) => setState(() => dragMs = x),
+            onChangeEnd: (x) { v.seekTo(Duration(milliseconds: x.round())); setState(() => drag = false); },
+          )),
+          Text(_t(dur), style: TextStyle(color: s.muted, fontSize: 12)),
+        ]),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          IconButton(iconSize: 32, icon: const Icon(Icons.replay_10), onPressed: () => _by(-10)),
+          const SizedBox(width: Sp.md),
+          IconButton(iconSize: 56, color: s.accent, icon: Icon(v.value.isPlaying ? Icons.pause_circle : Icons.play_circle), onPressed: () => v.value.isPlaying ? v.pause() : v.play()),
+          const SizedBox(width: Sp.md),
+          IconButton(iconSize: 32, icon: const Icon(Icons.forward_10), onPressed: () => _by(10)),
+        ]),
+        PopupMenuButton<double>(
+          tooltip: 'Playback speed', initialValue: speed, color: s.card,
+          onSelected: (x) { setState(() => speed = x); v.setPlaybackSpeed(x); },
+          itemBuilder: (_) => [for (final x in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]) PopupMenuItem(value: x, child: Text('${x}x'))],
+          child: Padding(padding: const EdgeInsets.all(Sp.md), child: Text('${speed}x', style: TextStyle(color: s.accent, fontWeight: FontWeight.w700))),
+        ),
+      ]),
+    );
   }
 }
