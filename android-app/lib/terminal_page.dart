@@ -43,6 +43,7 @@ class _TerminalPageState extends State<TerminalPage> {
   bool reconnecting = false, gaveUp = false;
   int attempt = 0;
   String? seenUrl; // the engine keeps the last banner; only a NEW link means a new approval is needed
+  bool onBattery = false; // the Mac is unplugged (stays true even after the banner is dismissed)
   bool powerDismissed = false; // the user swiped the battery warning away; it returns after the Mac has been plugged in and unplugged again
   String? powerWarn; // the Mac is running on battery
   Timer? powerT;
@@ -229,6 +230,7 @@ class _TerminalPageState extends State<TerminalPage> {
     final o = await File(tmp).readAsString();
     final pct = RegExp(r'(\d+)%').firstMatch(o)?.group(1);
     final onBatt = o.contains('Battery Power');
+    onBattery = onBatt;
     if (!onBatt) powerDismissed = false;
     setState(() => powerWarn = onBatt && !powerDismissed ? 'Your Mac is on battery${pct != null ? ' ($pct%)' : ''}. If it runs out it shuts down and cannot be reached until someone plugs it in.' : null);
   }
@@ -252,7 +254,13 @@ class _TerminalPageState extends State<TerminalPage> {
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Tooltip(message: '${widget.user}@${widget.ip}', child: Text(widget.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
           const SizedBox(height: 2),
-          StatusWord(tone.$1, tone.$2, key: const Key('tstatus')),
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            StatusWord(tone.$1, tone.$2, key: const Key('tstatus')),
+            if (onBattery && status.startsWith('connected')) ...[
+              Text('  ·  ', style: TextStyle(fontSize: 13, color: s.muted)),
+              Flexible(child: Text('Not charging', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: s.warn))),
+            ],
+          ]),
         ]),
         actions: [
           IconButton(
