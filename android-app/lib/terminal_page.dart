@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:xterm/xterm.dart';
 import 'engine.dart';
+import 'files_page.dart';
 import 'native.dart';
 import 'store.dart';
 import 'theme.dart';
@@ -216,6 +217,11 @@ class _TerminalPageState extends State<TerminalPage> {
         ]),
         actions: [
           StatusWord(tone.$1, tone.$2, key: const Key('tstatus')),
+          IconButton(
+            tooltip: 'Files on this Mac',
+            icon: Icon(Icons.folder_open_outlined, color: s.muted),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => FilesPage(name: widget.name, ip: widget.ip, user: widget.user))),
+          ),
           IconButton(
             tooltip: 'Show or hide the keyboard',
             icon: Icon(Icons.keyboard_outlined, color: s.muted),

@@ -22,6 +22,19 @@ class MainActivity : FlutterActivity() {
                 }
                 "deviceName" -> result.success(Settings.Global.getString(contentResolver, "device_name") ?: "${Build.MANUFACTURER} ${Build.MODEL}")
                 "version" -> result.success(packageManager.getPackageInfo(packageName, 0).versionName)
+                "saveToDownloads" -> {
+                    try {
+                        val name = call.argument<String>("name")!!
+                        val src = java.io.File(call.argument<String>("path")!!)
+                        val v = android.content.ContentValues().apply {
+                            put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name)
+                            put(android.provider.MediaStore.Downloads.RELATIVE_PATH, "Download/Remote Wake")
+                        }
+                        val uri = contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, v)!!
+                        contentResolver.openOutputStream(uri)!!.use { o -> src.inputStream().use { it.copyTo(o) } }
+                        result.success(null)
+                    } catch (e: Throwable) { result.error("save", e.message, null) }
+                }
                 "stop" -> { stopService(Intent(this, KeepAliveService::class.java)); result.success(null) }
                 // returns true when the app is already exempt from battery optimisation; otherwise opens the system prompt and returns false
                 "batteryExempt" -> {

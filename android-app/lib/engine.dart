@@ -29,7 +29,16 @@ int _shellOpen(String addr, String user, String pinned, int cols, int rows) {
   return using((a) => f(addr.toNativeUtf8(allocator: a), user.toNativeUtf8(allocator: a), pinned.toNativeUtf8(allocator: a), cols, rows));
 }
 
+String _fetch(String addr, String user, String pinned, String cmd, String dest) {
+  final f = _lib.lookupFunction<Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
+      Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>)>('rw_fetch');
+  return using((a) => _take(f(addr.toNativeUtf8(allocator: a), user.toNativeUtf8(allocator: a), pinned.toNativeUtf8(allocator: a), cmd.toNativeUtf8(allocator: a), dest.toNativeUtf8(allocator: a))));
+}
+
 class Engine {
+  /// Runs [cmd] on the Mac and saves its stdout to the local file [dest]. Returns '' or 'ERROR: ...'.
+  static Future<String> fetch(String addr, String user, String pinned, String cmd, String dest) => Isolate.run(() => _fetch(addr, user, pinned, cmd, dest));
+
   // Interactive shell with a PTY. open() blocks (dial + SSH handshake) so it runs off the UI isolate; the rest are quick buffer operations.
   static Future<int> shellOpen(String addr, String user, String pinned, int cols, int rows) => Isolate.run(() => _shellOpen(addr, user, pinned, cols, rows));
   static String lastHostKey() =>

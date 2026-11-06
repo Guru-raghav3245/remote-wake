@@ -383,3 +383,59 @@ func rw_shell_close(id C.int) {
 		sh.cl.Close()
 	}
 }
+
+// rw_fetch runs one command on the Mac and writes its raw stdout to the local file `dest` (binary-safe, used by the Files screen
+// for directory listings and downloads). Returns "" on success or "ERROR: ...". Capped at 1 GiB.
+//
+//export rw_fetch
+func rw_fetch(addr, user, pinned, cmd, dest *C.char) *C.char {
+	mu.Lock()
+	s := srv
+	mu.Unlock()
+	if s == nil {
+		return C.CString("ERROR: not started")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	conn, err := s.Dial(ctx, "tcp", C.GoString(addr))
+	if err != nil {
+		return C.CString("ERROR: dial: " + err.Error())
+	}
+	c, chans, reqs, err := ssh.NewClientConn(conn, C.GoString(addr), &ssh.ClientConfig{
+		User: C.GoString(user), Timeout: 30 * time.Second,
+		HostKeyCallback: func(_ string, _ net.Addr, k ssh.PublicKey) error {
+			if pin := C.GoString(pinned); pin != "" && pin != ssh.FingerprintSHA256(k) {
+				return fmt.Errorf("HOSTKEY_CHANGED")
+			}
+			return nil
+		},
+	})
+	if err != nil {
+		return C.CString("ERROR: ssh: " + err.Error())
+	}
+	cl := ssh.NewClient(c, chans, reqs)
+	defer cl.Close()
+	sess, err := cl.NewSession()
+	if err != nil {
+		return C.CString("ERROR: session: " + err.Error())
+	}
+	out, err := sess.StdoutPipe()
+	if err != nil {
+		return C.CString("ERROR: " + err.Error())
+	}
+	f, err := os.Create(C.GoString(dest))
+	if err != nil {
+		return C.CString("ERROR: " + err.Error())
+	}
+	defer f.Close()
+	if err := sess.Start(C.GoString(cmd)); err != nil {
+		return C.CString("ERROR: " + err.Error())
+	}
+	if _, err := io.Copy(f, io.LimitReader(out, 1<<30)); err != nil {
+		return C.CString("ERROR: " + err.Error())
+	}
+	if err := sess.Wait(); err != nil {
+		return C.CString("ERROR: " + err.Error())
+	}
+	return C.CString("")
+}
