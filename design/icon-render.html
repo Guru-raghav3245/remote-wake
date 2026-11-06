@@ -1,7 +1,7 @@
 <!doctype html><meta charset="utf-8"><body><pre id="out"></pre><script>
 // Renders every app icon (Mac iconset, Android launcher layers, notification glyph) with the same drawing code as logo-options.html (option B).
 // Run by design/make-icons.py via headless Chrome; results come back as data URLs in #out.
-const RAMP=" .:-=+*#%@";let MINT='123,224,176';
+const RAMP=" .:-=+*#%@";let MINT='170,240,208';
 function sample(text,cols,rows,font){const o=document.createElement('canvas');o.width=cols;o.height=rows;const g=o.getContext('2d');
  g.fillStyle='#fff';g.textAlign='center';g.textBaseline='middle';g.font=font;g.fillText(text,cols/2,rows/2);
  const d=g.getImageData(0,0,cols,rows).data;return(r,c)=>d[(r*cols+c)*4+3]/255}
@@ -32,7 +32,7 @@ function art(g,S,L){
   g.font=`900 ${S*.26}px Helvetica,Arial,sans-serif`;g.fillText('z',S*.38,S*.28)}}
 // spec: px canvas size, L logical size (picks the detail tier), frac = share of the canvas the artwork covers (centred), mode: full (dark tile) | glyph (no tile) | white (single colour, no tile)
 function render(px,L,frac,mode){const cv=document.createElement('canvas');cv.width=cv.height=px;const g=cv.getContext('2d');
- const A=px*frac,o=(px-A)/2;g.translate(o,o);MINT=mode==='white'?'255,255,255':'123,224,176';
+ const A=px*frac,o=(px-A)/2;g.translate(o,o);MINT=mode==='white'?'255,255,255':'170,240,208';
  if(mode==='full'){bg(g,A);const k=.74;g.translate(A/2,A/2);g.scale(k,k);g.translate(-A/2,-A/2)} // inside the tile, keep the artwork off the edges
  art(g,A,L);if(mode==='full')g.restore();return cv.toDataURL('image/png')}
 const out={};
