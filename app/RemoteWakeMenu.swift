@@ -666,7 +666,7 @@ struct MainView: View {
         }
         .padding(S.xl).frame(width: 884).background(T.bg)
         // a state change (awake/asleep, plugged in, steps ticking, phone online...) fades and eases instead of snapping
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: "\(m.running)\(m.holding)\(m.onAC)\(m.tsState)\(m.phoneOn)\(m.permsOK)\(m.ready)\(m.phones.first ?? "")\(setupDone)")
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: "\(m.running)\(m.holding)\(m.onAC)\(m.tsState)\(m.phoneOn)\(m.permsOK)\(m.ready)\(m.phones.first ?? "")\(setupDone)\(m.error ?? "")\(m.log.count)")
         .onChange(of: allDone) { if $0 { setupDone = true } }
         .onAppear { if allDone { setupDone = true } }
         .sheet(isPresented: $help) { HelpSheet { help = false } }
