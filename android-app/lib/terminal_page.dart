@@ -249,7 +249,7 @@ class _TerminalPageState extends State<TerminalPage> {
     if (!mounted) return;
     onBattery = onBatt;
     if (!onBatt) powerDismissed = false;
-    setState(() => powerWarn = onBatt && !powerDismissed ? 'Your Mac is on battery${pct != null ? ' ($pct%)' : ''}. If it runs out it shuts down and cannot be reached until someone plugs it in.' : null);
+    setState(() => powerWarn = onBatt && !powerDismissed ? 'Your Mac is on battery${pct != null ? ' ($pct%)' : ''}. Idle, it lasts days, but once it runs out it shuts down and cannot be reached until someone plugs it in.' : null);
   }
 
   // Follows `pmset -g pslog` over a second SSH channel: the Mac prints a line the moment the power source changes, so the header

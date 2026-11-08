@@ -541,7 +541,7 @@ struct Hero: View {
                 else { AsciiButton("STOP STAYING AWAKE", primary: false) { m.toggle() }.disabled(m.busy) }
                 VStack(alignment: .leading, spacing: S.xs) {
                     if !m.running { Text("! Action needed: your phone cannot reach this Mac while it sleeps.").font(ff(12, .semibold)).foregroundStyle(T.danger) }
-                    if m.running && m.holding && !m.onAC { Text("! On battery: if it runs out, your Mac shuts down and your phone cannot reach it until someone plugs it in.").font(ff(12, .semibold)).foregroundStyle(T.warn) }
+                    if m.running && m.holding && !m.onAC { Text("! On battery. Idle, it lasts days, but once it runs out your Mac shuts down and your phone cannot reach it until someone plugs it in.").font(ff(12, .semibold)).foregroundStyle(T.warn) }
                     if m.installed && !m.daemonCurrent { Text("! Update needed so your Mac also stays awake on battery.").font(ff(12, .semibold)).foregroundStyle(T.warn); AsciiButton("UPDATE", primary: false) { m.install() }.disabled(m.busy) }
                     if !m.heroText.isEmpty { Text(m.heroText).font(ff(12)).foregroundStyle(T.muted) }
                 }.fixedSize(horizontal: false, vertical: true)
