@@ -1,6 +1,6 @@
-# Product Spec: Remote Wake for Mac (v3.0)
+# Product Spec: Remote Wake for Mac (v3.1)
 
-**Version:** 3.0, 2 Nov 2026. **Status:** Personal project, working prototype. A Mac menu bar app, a bundled Tailscale, and an Android app with an SSH terminal are built and tested on one Mac, one real phone and an emulator. The overnight lid-closed test is still pending. **Replaces:** v2.1 (`Remote Wake for Mac Product Spec v2.md`, the "wake it every 30 seconds" design, kept for history) and v1.
+**Version:** 3.1, 8 Nov 2026 (app release 0.4.0). **Status:** Personal project, released on GitHub and a public site. A Mac app (window plus menu bar helper), a bundled Tailscale and tmux, and an Android app with an SSH terminal and a Files screen are built and tested on one Mac, one real phone and an emulator. The overnight lid-closed test on AC is still pending; one lid-closed battery run passed. **Replaces:** v2.1 (`Remote Wake for Mac Product Spec v2.md`, the "wake it every 30 seconds" design, kept for history) and v1.
 
 ## 1. What it is
 
@@ -8,7 +8,7 @@ Remote Wake for Mac lets you open a terminal on your Mac from your Android phone
 
 **The promise:** a Mac that is plugged in with its lid closed stays awake and reachable, and you tap it in the phone app and get a shell in under a second.
 
-**Primary use case:** a Mac left at home, plugged in, lid closed, for days or weeks (for example on holiday), where you want to reach it remotely. Battery use is ignored while it is on AC.
+**Primary use case:** a Mac left at home, plugged in, lid closed, for days or weeks (for example on holiday), where you want to reach it remotely. It also stays awake on battery (section 3), with warnings.
 
 This is not a remote desktop product. It gives a terminal as the Mac user, nothing else.
 
@@ -28,7 +28,7 @@ The old cloud design (Vercel, Upstash, pairing codes, the PWA, the check-in agen
 
 ## 3. How it works
 
-1. The Mac app installs a small root LaunchDaemon (`com.guru.stayawake`) that runs `/usr/bin/caffeinate -s`. This keeps the Mac awake, lid closed too, but only on AC. On battery the Mac sleeps normally.
+1. The Mac app installs a small root LaunchDaemon (`com.guru.stayawake`) that runs a short `sh`: it sets `pmset -a disablesleep 1` (blocks lid-close sleep on battery) and runs `caffeinate -s -i`. On stop, or when caffeinate ends, it sets `disablesleep 0` again (it is a persistent system setting; the uninstall script also resets it).
 2. The app also installs Tailscale (a build of the open-source `tailscale` and `tailscaled` 1.104.4, bundled in the DMG) as a system daemon with Tailscale SSH turned on. It runs before anyone logs in.
 3. The Android app embeds the Tailscale engine (`tsnet`, userspace, no VPN permission) and an SSH client, written in Go and loaded by a Flutter app. The user signs in to the same Tailscale account once.
 4. The phone lists the Macs on the tailnet. The user taps one, enters the Mac user name, and gets an interactive terminal.
@@ -50,13 +50,17 @@ The old cloud design (Vercel, Upstash, pairing codes, the PWA, the check-in agen
 - Waking a sleeping Mac (not possible, see section 2).
 - Reaching a Mac that is shut down, out of power, off the network, or stopped at the FileVault unlock screen after a reboot.
 - Unlocking the Mac or bypassing FileVault.
-- Remote desktop or file access (a terminal only).
-- Keeping the Mac awake on battery.
+- Remote desktop. Files are browse and view only (section 6); there is no screen sharing.
+- Reaching a Mac whose battery has run out (it shuts down until plugged in).
 - iPhone in this version (it would need a paid developer account).
 
 ## 5. Mac side
 
-- **Menu bar app** (SwiftUI, `app/RemoteWakeMenu.swift`): a switch "Stay awake on AC", the power source, the Tailscale state and address, buttons to install and to sign in or connect Tailscale, and a "Next: set up your phone" hint with the Android app bundled inside (it shows the phone's name once a phone has joined).
+- **One binary, two modes** (SwiftUI, `app/RemoteWakeMenu.swift`): the main app `Remote Wake.app` (window and Dock icon) and a nested menu bar helper `Remote Wake Menu.app` (login item via `SMAppService`, keeps running when the window is quit). Dark "terminal-bloom" design (ASCII status word AWAKE / ASLEEP, readouts, log); tokens in `design/tokens.md`.
+- **Stay awake switch:** the hero shows AWAKE, ASLEEP, "Awake on battery" (amber, with a warning) or PLUG IN. If the installed plist predates battery support an UPDATE button re-runs the admin install.
+- **Phone sessions (always on):** a bundled tmux (3.8, built from source) runs as a server started by the app, so it lives in the desktop session. Phone logins attach to it through a marked block in `~/.zshrc` and inherit the open keychain (tools such as Claude Code stay logged in) and programs survive a phone drop. zsh only.
+- **Full Disk Access:** the helper needs it for some folders; the app guides the user and restarts the helper when the grant changes.
+- **Phone setup:** the app shows the setup steps and reveals the bundled APK; once an Android node exists it shows the phone's name.
 - **Install** is one admin password prompt. It installs Tailscale, the stay-awake daemon, and a sudoers rule limited to the four `launchctl enable/disable/bootstrap/bootout` commands for that one daemon, so the switch works silently afterwards.
 - **No Python or other runtime** is needed on the Mac.
 - **Updates are ours:** each Tailscale security fix means rebuilding the binaries (`app/build-tailscale.sh`) and shipping a new DMG. Tailscale publishes no prebuilt open-source macOS binaries.
@@ -65,12 +69,15 @@ The old cloud design (Vercel, Upstash, pairing codes, the PWA, the check-in agen
 ## 6. Phone app (Android)
 
 - **Home:** Tailscale status and address, a "Sign in to Tailscale" button (opens the browser), and the list of devices on the tailnet (online first, Macs preferred). The user name for each Mac is remembered.
-- **Terminal:** a PTY shell (`xterm-256color`) with an extra-keys row (Esc, Tab, sticky Ctrl, ^C, ^D, arrows, `| / - ~`), resize with the screen and keyboard, full-screen programs such as `vi` work.
+- **Terminal:** a PTY shell (`xterm-256color`) with key rows (Esc, Tab, sticky Ctrl, red Stop ^C, arrows, `| / - ~`; hideable). The terminal view is the only text input. Full-screen programs such as `vi` work. A patched copy of the xterm package fixes a crash on `CSI 1 K` at column 0.
+- **Files:** browse the Mac and view md, txt, images, video, PDF, SVG, audio and HTML; save to Downloads or share. Commands run inside the phone-session tmux server so macOS does not ask `tailscaled` for folder access.
+- **Battery:** the app polls `pmset -g batt` every 60 s over SSH and warns when the Mac runs on battery (it shuts down when empty and cannot be reached until plugged in). Power changes show at once through a `pmset pslog` stream.
+- **Design:** dark terminal-bloom theme shared with the Mac app (`android-app/lib/theme.dart`); home screen has an ASCII laptop with ONLINE / ASLEEP / NO MAC / SIGN IN / CONNECTING and an Edit mode.
 - **Host-key pinning:** the Mac's SSH key is saved on first connection (trust on first use). A different key later shows a "Host key changed" dialog with a "Trust new key" choice.
 - **Reconnect on drop:** an SSH keepalive notices a dead connection in about 25 s, a "Connection lost, reconnecting..." banner appears, and the app retries (2, 4, 8, 15 s, 10 tries, then a Retry button). A reconnect opens a new shell, so running programs are stopped (use `tmux` on the Mac to keep them).
 - **Approval prompt:** if the tailnet's SSH rule is "check", Tailscale asks for a browser approval about every 12 hours. The app shows an Approve button (the link arrives as the SSH banner).
 - **Background:** a foreground service (partial wake lock, notification) keeps the session alive while the screen is off or the app is in the background; the app asks for the notification permission and a battery-optimisation exemption once.
-- **Build:** a signed release APK (about 40 MB, arm64), icon "terminal prompt with zz" on a dark background. The keystore is `~/.remote-wake-android.jks` and must be backed up: losing it means phones have to uninstall to update.
+- **Build:** a signed release APK (about 40 MB, arm64), icon `>_` with a Z made of small z's (generated by `design/make-icons.py`). The keystore is `~/.remote-wake-android.jks` and must be backed up: losing it means phones have to uninstall to update.
 
 ## 7. Security
 
@@ -102,6 +109,8 @@ One MacBook Pro (Apple M5 Pro, macOS 26.6.2), one Nothing Phone (CMF Phone 2 Pro
 | Reconnect after a real network drop (emulator, Wi-Fi and data off, then on) | Pass: banner within about 25 s, new shell in about 20 ms |
 | Screen off 4 minutes on mobile data | Pass, but the phone was charging (Doze not fully applied) |
 | Tailscale "check" approval needed after about a day | Found and handled (banner and Approve button) |
+| Phone sessions: tmux in the desktop session, `claude` starts with no login prompt | Pass on the real Mac and phone |
+| Lid closed, unplugged, in a bag, travelling, no phone sessions (7 to 8 Nov 2026) | Pass: awake the whole time (caffeinate 41 h), 100% to 94% in about 15 h (about 0.4% an hour), battery max temperature 40 C |
 
 ## 9. Not tested, and risks
 
@@ -113,7 +122,7 @@ One MacBook Pro (Apple M5 Pro, macOS 26.6.2), one Nothing Phone (CMF Phone 2 Pro
 - **Distribution on other machines:** ad-hoc signing gives other Macs a Gatekeeper warning. A sideloaded Android app may trigger a Google Play Protect warning.
 - **Name resolution:** the phone could not resolve the MagicDNS name right after a Tailscale reset (use the address or wait).
 - **The embedded engine is a community pattern.** Android 11 and later deny apps the network interface list, so the engine supplies a fake list (the same hook Tailscale's own app uses). Network changes were tested only on the one phone and the emulator.
-- **Battery on the Mac:** none by design (AC only). Not measured on the phone.
+- **Battery on the Mac:** idle drain measured once (about 0.4% an hour). Not measured: temperature overnight, drain with active phone sessions, run-down to 0%. Phone battery use not measured.
 
 ## 10. Free and what would cost money
 
@@ -129,8 +138,8 @@ Everything above costs nothing today. These would cost money, so ask before doin
 | Part | Status |
 | --- | --- |
 | Stay-awake daemon, install and uninstall scripts | Done, tested |
-| Mac menu bar app, bundled Tailscale, DMG with the Android app | Done; the phone-setup steps view was not seen on screen |
-| Android app: Tailscale sign-in, device list, terminal, host-key pinning, foreground service, reconnect, approval prompt, signed release, icon | Done; real-phone checks listed in section 9 are pending |
+| Mac app (window and menu bar helper), bundled Tailscale and tmux, DMG with the Android app, stay awake on battery | Done, released as 0.4.0; setup checklist and off state not seen on screen |
+| Android app: Tailscale sign-in, device list, terminal, host-key pinning, foreground service, reconnect, approval prompt, signed release, icon, Files screen, battery warnings | Done, released as 0.4.0; real-phone checks listed in section 9 are pending |
 | App icons (Android and Mac) | Done (PWA icons not needed, the PWA is part of the old design) |
 | Spec for the new design | This document |
 | iPhone app | Not started (needs a paid account) |
@@ -143,7 +152,7 @@ Everything above costs nothing today. These would cost money, so ask before doin
 
 ## 13. Cleanup list
 
-- Pending tests: the overnight soak test, FileVault and power-loss, the 10-minute lid-closed run, the real-phone checks in section 9.
+- Pending tests: the overnight soak test on AC, a battery run-down to 0%, FileVault and power-loss, the 10-minute lid-closed run, the real-phone checks in section 9.
 - Switch Xcode back to the personal Apple account (Xcode > Settings > Accounts).
 - Revoke the APNs key `wakeprobe apns` in the developer portal.
 - Delete the GCP test project `<gcp-project>` (VM and firewall rules): the owner runs `gcloud projects delete <gcp-project>` (the assistant's attempt was blocked).

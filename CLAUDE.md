@@ -8,12 +8,14 @@ android-proto/  Go Tailscale engine (tsnet + SSH) used by android-app/build-engi
 agent/          Root LaunchDaemon + install/uninstall scripts for stay-awake and Tailscale
 site/           Public website (single static page, deployed with the Vercel CLI)
 design/         Design tokens (tokens.md), logo/icon generator, demo pages
-docs/           Current product spec (v3); archive/ holds the old v2 specs
+docs/           Current product spec (v3.1, matches release 0.4.0); archive/ holds the old v2 specs
 research/       Finished experiments, kept for reference:
   apns-probe/   Test 1 (APNs wake): Wake Probe app + extension, project.yml, send.sh, local-only key/build
   wake-probes/  Tests 2 to 5 probe scripts (client/server/poll, trial*.sh, collect*.sh, logs)
   results/      Test write-ups (Test 1, 2, 4, 5) and RESULTS.md
 ```
+**Current state (8 Nov 2026):** release 0.4.0 is live (stay awake on battery too, phone sessions always on, Files screen, battery warnings). The dated sections below are a history log: where they say "AC only" or "battery is ignored", the 7 Nov entry and `docs/Remote Wake for Mac Product Spec v3.md` win. Still pending: overnight lid-closed soak on AC, FileVault/power-loss, battery run-down to 0%, real-phone checks.
+
 Scripts in `research/*` use paths relative to their own folder, so keep each folder together. Older notes below that name `project.yml`, `send.sh`, `server.py`, `client.py`, `wakeloop.py`, `trial*.sh`, `RESULTS.md`, the Test files or the specs mean the files in these folders.
 
 
