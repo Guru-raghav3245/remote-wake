@@ -1,5 +1,21 @@
 # Remote Wake (project notes for Claude Code)
 
+## Competitor comparison (8 Nov 2026, table supplied by the user as a screenshot)
+Footnotes `*` (Pane, Mac + Android) and `**` (Pane, persistent sessions) were not in the screenshot. "Open source: No" for Remote Wake is as supplied; the GitHub repo is public (see "Public repo" below), so check that cell.
+
+| Capability | Remote Wake | Passthrough | Pocketlid | Pane | OwnDesk |
+| --- | --- | --- | --- | --- | --- |
+| Mac + Android | Yes | Yes | Yes | Yes* | Yes |
+| Keep Mac awake | Yes | Yes | Yes | No | No |
+| Wake sleeping Mac | No | Not advertised | Yes | No | No |
+| Remote terminal | Yes | Yes | Yes | Yes | Yes |
+| Persistent terminal sessions | Yes | Yes | Not established | Yes** | Not established |
+| Remote file browser | Yes | Not established | Yes | Yes | No |
+| Remote desktop | No | iPhone | Yes | No | Yes |
+| Tailscale integration | Bundled | Optional | No | Required | Optional |
+| Works over mobile data | Yes | Yes | Yes | Yes | Via Tailscale |
+| Open source | No | Yes | No | Yes | Yes |
+
 ## Repository layout (reorganised 5 Nov 2026)
 ```
 app/            Mac app (SwiftUI, one binary: window + menu-bar helper), build scripts, vendored Tailscale/tmux builds
