@@ -102,6 +102,7 @@ func rw_state() *C.char {
 		OS     string `json:"os"`
 		Online bool   `json:"online"`
 		Seen   int64  `json:"seen"` // unix seconds the peer was last seen, 0 if unknown
+		Expired bool  `json:"expired"` // the peer's Tailscale login (node key) expired: it must sign in again
 	}
 	peers := []peer{}
 	for _, p := range st.Peer {
@@ -110,7 +111,7 @@ func rw_state() *C.char {
 			if !p.LastSeen.IsZero() {
 				seen = p.LastSeen.Unix()
 			}
-			peers = append(peers, peer{p.HostName, p.TailscaleIPs[0].String(), p.OS, p.Online, seen})
+			peers = append(peers, peer{p.HostName, p.TailscaleIPs[0].String(), p.OS, p.Online, seen, p.Expired})
 		}
 	}
 	b, _ := json.Marshal(map[string]any{"state": st.BackendState, "authUrl": st.AuthURL, "ips": ips, "peers": peers})
