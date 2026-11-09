@@ -113,6 +113,7 @@ class _TerminalPageState extends State<TerminalPage> {
     setState(() => status = 'connected in ${sw.elapsedMilliseconds} ms');
     _checkPower();
     _watchPower();
+    _watchOpen();
     powerT ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkPower());
     rp = ReceivePort();
     rp!.listen((m) {
@@ -275,6 +276,45 @@ class _TerminalPageState extends State<TerminalPage> {
     await Isolate.spawn(_reader, [powerRp!.sendPort, w]);
   }
 
+  // `open FILE` typed in a phone session (by you or by Claude Code) appends the path to a queue file on the Mac; following it over a
+  // second SSH channel shows the file in the viewer. The heartbeat file tells the Mac's open wrapper that a phone is listening.
+  int openId = -1;
+  ReceivePort? openRp;
+  Timer? openBeat;
+  void _stopOpenWatch() {
+    openBeat?.cancel(); openBeat = null;
+    openRp?.close(); openRp = null;
+    if (openId > 0) { Engine.shellClose(openId); openId = -1; }
+  }
+
+  Future<void> _watchOpen() async {
+    _stopOpenWatch();
+    final pin = await Store.hostKey(widget.ip);
+    const d = r'"$HOME/Library/Application Support/Remote Wake"';
+    final w = await Engine.streamOpen('${widget.ip}:22', widget.user, pin,
+        'd=$d; touch "\$d/open-queue"; tail -n0 -F "\$d/open-queue" & tp=\$!; '
+        'while IFS= read -r -t 8 x; do date +%s > "\$d/phone.alive"; done; kill \$tp; rm -f "\$d/phone.alive"');
+    if (w < 0) return;
+    if (!mounted) { Engine.shellClose(w); return; }
+    openId = w;
+    // the phone sends a newline every 3 s; the Mac loop stops (and stops claiming "phone is listening") 8 s after they stop
+    openBeat = Timer.periodic(const Duration(seconds: 3), (_) => Engine.shellWrite(w, base64.encode(const [10])));
+    Engine.shellWrite(w, base64.encode(const [10]));
+    openRp = ReceivePort();
+    var buf = '';
+    openRp!.listen((m) {
+      if (m is! String || !mounted) return;
+      buf += utf8.decode(base64.decode(m), allowMalformed: true);
+      while (buf.contains('\n')) {
+        final i = buf.indexOf('\n');
+        final line = buf.substring(0, i).trim();
+        buf = buf.substring(i + 1);
+        if (line.startsWith('/')) showMacFile(context, widget.ip, widget.user, line);
+      }
+    });
+    await Isolate.spawn(_reader, [openRp!.sendPort, w]);
+  }
+
   void _stopPowerWatch() {
     powerRp?.close(); powerRp = null;
     if (powerId > 0) { Engine.shellClose(powerId); powerId = -1; }
@@ -282,6 +322,7 @@ class _TerminalPageState extends State<TerminalPage> {
 
   @override
   void dispose() {
+    _stopOpenWatch();
     powerT?.cancel();
     blockedT?.cancel();
     _stopPowerWatch();

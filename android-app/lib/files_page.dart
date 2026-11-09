@@ -8,15 +8,54 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:pdfx/pdfx.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import 'engine.dart';
 import 'native.dart';
+import 'office_view.dart';
 import 'store.dart';
 import 'theme.dart';
 
 String _q(String p) => "'${p.replaceAll("'", "'\\''")}'"; // single-quote a path for the Mac's shell
+
+// Copies a Mac file to the phone for the viewer. Old .doc/.xls/.ppt are first turned into a PDF on the Mac with LibreOffice when it is
+// installed there (the phone cannot read those formats); without it the original comes back and the viewer offers Save and Share.
+Future<(File, String)> fetchMacFile(String ip, String user, String path) async {
+  final name = path.split('/').last;
+  final d = Directory('${(await getTemporaryDirectory()).path}/dl')..createSync(recursive: true);
+  final pin = await Store.hostKey(ip);
+  final e = _ext(name);
+  if (_isBlocked(name)) throw 'Not copied to the phone: installers, private keys and certificates stay on the Mac.';
+  if (e == 'rtf') {
+    final html = '${d.path}/$name.html';
+    final r = await Engine.fetch('$ip:22', user, pin, _FilesPageState.viaTmux('textutil -convert html -stdout ${_q(path)}'), html);
+    if (r.isEmpty && File(html).lengthSync() > 0) return (File(html), '${name.substring(0, name.length - 3)}html');
+  }
+  if (_legacy.contains(e)) {
+    final pdf = '${d.path}/$name.pdf';
+    final cmd = r'o=$(mktemp -d /tmp/rwc.XXXXXX); s=/Applications/LibreOffice.app/Contents/MacOS/soffice; [ -x $s ] || s=$(command -v soffice); '
+        'if [ -n "\$s" ] && cp ${_q(path)} "\$o/in.$e"; then "\$s" --headless --convert-to pdf --outdir "\$o" "\$o/in.$e" >/dev/null 2>&1; cat "\$o/in.pdf"; fi; rm -rf "\$o"';
+    final r = await Engine.fetch('$ip:22', user, pin, _FilesPageState.viaTmux(cmd), pdf);
+    if (r.isEmpty && File(pdf).lengthSync() > 0) return (File(pdf), '${name.substring(0, name.length - e.length)}pdf');
+  }
+  final f = '${d.path}/$name';
+  final r = await Engine.fetch('$ip:22', user, pin, _FilesPageState.viaTmux('cat ${_q(path)}'), f);
+  if (r.isNotEmpty) throw r.replaceFirst('ERROR: ', '');
+  return (File(f), name);
+}
+
+// A file the Mac opened with `open` inside a phone session (see the open wrapper in RemoteWakeMenu.swift): fetch it and show the viewer.
+Future<void> showMacFile(BuildContext context, String ip, String user, String path) async {
+  final nav = Navigator.of(context), msg = ScaffoldMessenger.of(context);
+  try {
+    final (f, name) = await fetchMacFile(ip, user, path);
+    nav.push(MaterialPageRoute(builder: (_) => ViewerPage(file: f, name: name)));
+  } catch (e) {
+    msg.showSnackBar(SnackBar(content: Text('$e')));
+  }
+}
 
 // Read-only file browser for the Mac, over the same Tailscale SSH link as the terminal. Starts in the folder the phone session is in.
 class FilesPage extends StatefulWidget {
@@ -39,7 +78,7 @@ class _FilesPageState extends State<FilesPage> {
   // or Downloads. The phone-session tmux server belongs to the helper app, which has Full Disk Access, so run the command inside it.
   // The command goes into a script file and its output into a temp dir, then is copied back out (binary-safe). Without a running
   // phone session it runs directly.
-  static String _viaTmux(String cmd) {
+  static String viaTmux(String cmd) {
     const t = r'"$HOME/Library/Application Support/Remote Wake/tmux"';
     return 'if [ -x $t ] && $t -L remotewake has-session 2>/dev/null; then '
         'd=\$(mktemp -d /tmp/rwf.XXXXXX); printf %s ${_q(cmd)} > \$d/c.sh; '
@@ -49,7 +88,7 @@ class _FilesPageState extends State<FilesPage> {
   }
 
   Future<String> _run(String cmd, String dest) async =>
-      Engine.fetch('${widget.ip}:22', widget.user, await Store.hostKey(widget.ip), _viaTmux(cmd), dest);
+      Engine.fetch('${widget.ip}:22', widget.user, await Store.hostKey(widget.ip), viaTmux(cmd), dest);
 
   // [to] null = the phone session's current folder (tmux pane path), else home
   Future<void> _list(String? to) async {
@@ -67,15 +106,17 @@ class _FilesPageState extends State<FilesPage> {
   }
 
   Future<void> _open(String name) async {
-    final path = dir == '/' ? '/$name' : '$dir/$name';
     setState(() => busy = true);
-    final d = Directory('${(await getTemporaryDirectory()).path}/dl')..createSync(recursive: true);
-    final f = '${d.path}/$name';
-    final r = await _run('cat ${_q(path)}', f);
-    if (!mounted) return;
-    setState(() => busy = false);
-    if (r.isNotEmpty) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.replaceFirst('ERROR: ', '')))); return; }
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => ViewerPage(file: File(f), name: name)));
+    try {
+      final (f, n) = await fetchMacFile(widget.ip, widget.user, dir == '/' ? '/$name' : '$dir/$name');
+      if (!mounted) return;
+      setState(() => busy = false);
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => ViewerPage(file: f, name: n)));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
   }
 
   @override
@@ -120,10 +161,14 @@ class _FilesPageState extends State<FilesPage> {
 
 String _ext(String n) => n.contains('.') ? n.split('.').last.toLowerCase() : '';
 const _pdf = {'pdf'}, _svg = {'svg'}, _html = {'html', 'htm'}, _aud = {'mp3', 'wav', 'm4a', 'aac', 'ogg', 'oga', 'flac', 'opus'}, _md = {'md', 'markdown'}, _img = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'}, _vid = {'mp4', 'mov', 'm4v', 'webm', 'mkv'};
+const _office = {'docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp'}, _legacy = {'doc', 'xls', 'ppt'}, _csv = {'csv', 'tsv'};
+// Never copied to the phone: installers (large, nothing to preview) and private keys / certificates (should not end up on a phone by accident).
+const _blocked = {'dmg', 'pkg', 'app', 'exe', 'apk', 'dylib', 'p12', 'pfx', 'pem', 'key', 'p8', 'jks', 'keystore'};
+bool _isBlocked(String name) => _blocked.contains(_ext(name)) || RegExp(r'^id_(rsa|dsa|ecdsa|ed25519)$').hasMatch(name);
 const _txt = {'txt', 'log', 'json', 'yaml', 'yml', 'toml', 'csv', 'py', 'js', 'ts', 'go', 'swift', 'dart', 'kt', 'java', 'sh', 'zsh', 'html', 'css', 'c', 'h', 'rs', 'rb', 'xml', 'ini', 'cfg', 'conf', 'env', 'sql'};
 IconData _icon(String n) {
   final e = _ext(n);
-  return _pdf.contains(e) ? Icons.picture_as_pdf_outlined : _svg.contains(e) ? Icons.image_outlined : _html.contains(e) ? Icons.language : _aud.contains(e) ? Icons.audiotrack_outlined : _img.contains(e) ? Icons.image_outlined : _vid.contains(e) ? Icons.movie_outlined : _md.contains(e) || _txt.contains(e) ? Icons.description_outlined : Icons.insert_drive_file_outlined;
+  return _pdf.contains(e) ? Icons.picture_as_pdf_outlined : _svg.contains(e) ? Icons.image_outlined : _html.contains(e) ? Icons.language : _csv.contains(e) ? Icons.table_chart_outlined : _office.contains(e) ? Icons.description_outlined : _aud.contains(e) ? Icons.audiotrack_outlined : _img.contains(e) ? Icons.image_outlined : _vid.contains(e) ? Icons.movie_outlined : _md.contains(e) || _txt.contains(e) ? Icons.description_outlined : Icons.insert_drive_file_outlined;
 }
 
 // Shows a downloaded file: markdown rendered, text/code as plain monospace, images, video; anything else goes to the share sheet.
@@ -153,7 +198,13 @@ class _ViewerPageState extends State<ViewerPage> {
         ..setNavigationDelegate(NavigationDelegate(onNavigationRequest: (r) => r.url.startsWith('file:') || r.url.startsWith('about:') ? NavigationDecision.navigate : NavigationDecision.prevent))
         ..loadFile(widget.file.path);
     }
-    if (!_vid.contains(e) && !_img.contains(e) && !_pdf.contains(e) && !_svg.contains(e) && !_aud.contains(e)) _loadText();
+    if (_office.contains(e)) {
+      try {
+        web = WebViewController()
+          ..setNavigationDelegate(NavigationDelegate(onNavigationRequest: (r) => r.url.startsWith('about:') ? NavigationDecision.navigate : NavigationDecision.prevent))
+          ..loadHtmlString(e == 'docx' ? docxToHtml(widget.file) : e == 'xlsx' ? xlsxToHtml(widget.file) : e == 'pptx' ? pptxToHtml(widget.file) : odfToHtml(widget.file));
+      } catch (_) { loaded = true; }   // unreadable file: falls through to "No preview"
+    } else if (!_vid.contains(e) && !_img.contains(e) && !_pdf.contains(e) && !_svg.contains(e) && !_aud.contains(e)) _loadText();
   }
 
   // Any file that is not an image or video is shown as text when it has no NUL bytes (so .txt and unknown extensions both open).
@@ -164,7 +215,16 @@ class _ViewerPageState extends State<ViewerPage> {
       final more = await raf.length() > b.length;
       await raf.close();
       if (b.contains(0)) { if (mounted) setState(() => loaded = true); return; }
-      final t = utf8.decode(b, allowMalformed: true) + (more ? '\n\n[... file continues; showing the first 2 MB]' : '');
+      var t = utf8.decode(b, allowMalformed: true);
+      final e = _ext(widget.name);
+      if (_csv.contains(e) && !more) {
+        web = WebViewController()..loadHtmlString(csvToHtml(t, sep: e == 'tsv' ? '\t' : ','));
+      } else if (!more && e == 'json') {
+        try { t = const JsonEncoder.withIndent('  ').convert(jsonDecode(t)); } catch (_) {}
+      } else if (!more && e == 'ipynb') {
+        try { t = ipynbToText(t); } catch (_) {}
+      }
+      t += more ? '\n\n[... file continues; showing the first 2 MB]' : '';
       if (mounted) setState(() { text = t; loaded = true; });
     } catch (_) { if (mounted) setState(() => loaded = true); }
   }
@@ -193,7 +253,7 @@ class _ViewerPageState extends State<ViewerPage> {
     } else if (web != null && !source) {
       body = WebViewWidget(controller: web!);
     } else if (_img.contains(e)) {
-      body = InteractiveViewer(child: Center(child: Image.file(widget.file)));
+      body = InteractiveViewer(child: Center(child: Image.file(widget.file, errorBuilder: (_, __, ___) => Padding(padding: const EdgeInsets.all(Sp.xl), child: Text('This image format cannot be shown here. Use Open with, Save or Share.', textAlign: TextAlign.center, style: TextStyle(color: s.muted))))));
     } else if (text != null) {
       body = _md.contains(e)
           ? Markdown(data: text!, selectable: true, onTapLink: (_, __, ___) {}, styleSheet: MarkdownStyleSheet(
@@ -204,7 +264,7 @@ class _ViewerPageState extends State<ViewerPage> {
     } else if (!loaded) {
       body = Center(child: CircularProgressIndicator(color: s.accent));
     } else {
-      body = Center(child: Padding(padding: const EdgeInsets.all(Sp.xl), child: Text('No preview for this file type. Use Save or Share.', textAlign: TextAlign.center, style: TextStyle(color: s.muted))));
+      body = Center(child: Padding(padding: const EdgeInsets.all(Sp.xl), child: Text(_legacy.contains(e) ? 'Old Office formats need LibreOffice (free, libreoffice.org) on the Mac to preview. Use Open with, Save or Share.' : 'No preview for this file type. Use Open with (another app on this phone), Save or Share.', textAlign: TextAlign.center, style: TextStyle(color: s.muted))));
     }
     return Scaffold(
       backgroundColor: full ? Colors.black : null,
@@ -212,7 +272,12 @@ class _ViewerPageState extends State<ViewerPage> {
         titleSpacing: 0,
         title: Text(widget.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
         actions: [
-          if (web != null) IconButton(tooltip: source ? 'Show the page' : 'Show the code', icon: Icon(source ? Icons.web : Icons.code, color: s.muted), onPressed: () => setState(() => source = !source)),
+          if (web != null && _html.contains(e)) IconButton(tooltip: source ? 'Show the page' : 'Show the code', icon: Icon(source ? Icons.web : Icons.code, color: s.muted), onPressed: () => setState(() => source = !source)),
+          IconButton(tooltip: 'Open with another app', icon: Icon(Icons.open_in_new, color: s.muted), onPressed: () async {
+            final m = ScaffoldMessenger.of(c);
+            final res = await OpenFilex.open(widget.file.path);
+            if (res.type != ResultType.done) m.showSnackBar(const SnackBar(content: Text('No app on this phone can open this file')));
+          }),
           IconButton(tooltip: 'Save to phone (Downloads)', icon: Icon(Icons.download_outlined, color: s.muted), onPressed: () async {
             final m = ScaffoldMessenger.of(c);
             try { await Native.saveToDownloads(widget.file.path, widget.name); m.showSnackBar(SnackBar(content: Text('Saved to Downloads: ${widget.name}'))); }
