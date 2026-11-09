@@ -43,8 +43,29 @@ let zBlock = """
 _rw="$HOME/Library/Application Support/Remote Wake/tmux"
 if [[ -n $SSH_CONNECTION && -z $TMUX && -x $_rw ]] && "$_rw" -L \(tmuxSock) has-session -t phone 2>/dev/null; then "$_rw" -L \(tmuxSock) attach -t phone && exit; fi
 unset _rw
+# Inside the phone session, `open FILE` goes through Remote Wake's wrapper (shows the file on the phone while the app is open).
+[[ $TMUX == *\(tmuxSock)* ]] && PATH="$HOME/Library/Application Support/Remote Wake/bin:$PATH"
 \(zMark.1)
 """
+// `open` wrapper: only inside the phone-session tmux, only for existing files, and only while the phone app is listening (it touches
+// phone.alive every 3 s). Anything else runs the real /usr/bin/open, so desktop terminals are untouched.
+let openWrapper = """
+#!/bin/sh
+d="$HOME/Library/Application Support/Remote Wake"
+case "$TMUX" in *\(tmuxSock)*) t=$(cat "$d/phone.alive" 2>/dev/null); [ -n "$t" ] && [ $(( $(date +%s) - t )) -lt 10 ] && [ $# -ge 1 ] || t= ;; *) t= ;; esac
+if [ -n "$t" ]; then
+  for a in "$@"; do [ -f "$a" ] || t=; done
+  if [ -n "$t" ]; then for a in "$@"; do printf '%s/%s\\n' "$(cd "$(dirname "$a")" && pwd -P)" "$(basename "$a")" >> "$d/open-queue"; done; exit 0; fi
+fi
+exec /usr/bin/open "$@"
+"""
+func installOpenWrapper() {
+    let dir = phoneDir + "/bin", f = dir + "/open"
+    if (try? String(contentsOfFile: f, encoding: .utf8)) == openWrapper { return }
+    try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    try? openWrapper.write(toFile: f, atomically: true, encoding: .utf8)
+    chmod(f, 0o755)
+}
 let tmuxConf = """
 set -g status off
 set -g history-limit 20000
@@ -73,11 +94,19 @@ func ensurePhone() {
     guard fd >= 0 else { return }
     defer { close(fd) }
     guard flock(fd, LOCK_EX | LOCK_NB) == 0 else { return }
+    installOpenWrapper()
     if !phoneEnabled() || !FileManager.default.isExecutableFile(atPath: tmuxBin) { setPhone(true) }
+    else if !zshHasCurrentBlock() { rewriteZBlock() }   // block text changed in an update: rewrite it, keep running sessions
     else if (try? String(contentsOfFile: phoneDir + "/tmux.conf", encoding: .utf8)) != tmuxConf {   // config changed in an update: apply it to the running server too
         try? tmuxConf.write(toFile: phoneDir + "/tmux.conf", atomically: true, encoding: .utf8)
         _ = tmux(["source-file", phoneDir + "/tmux.conf"])
     }
+}
+func zshHasCurrentBlock() -> Bool { ((try? String(contentsOfFile: zshrc, encoding: .utf8)) ?? "").contains(zBlock) }
+func rewriteZBlock() {
+    var z = (try? String(contentsOfFile: zshrc, encoding: .utf8)) ?? ""
+    if let r = z.range(of: "\n?" + NSRegularExpression.escapedPattern(for: zMark.0) + "[\\s\\S]*?" + NSRegularExpression.escapedPattern(for: zMark.1) + "\n?", options: .regularExpression) { z.replaceSubrange(r, with: "\n" + zBlock + "\n") }
+    try? z.write(toFile: zshrc, atomically: false, encoding: .utf8)
 }
 func setPhone(_ on: Bool) {
     let fm = FileManager.default
