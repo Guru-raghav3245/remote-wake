@@ -249,6 +249,7 @@ class _TerminalPageState extends State<TerminalPage> {
   void _applyPower(bool onBatt, String? pct) {
     if (!mounted) return;
     onBattery = onBatt;
+    if (pct != null && int.tryParse(pct) != null) Store.setBattery(widget.ip, int.parse(pct), onBatt); // remembered for the home screen's "why offline" guess
     if (!onBatt) powerDismissed = false;
     setState(() => powerWarn = onBatt && !powerDismissed ? 'Your Mac is on battery${pct != null ? ' ($pct%)' : ''}. Idle, it lasts days, but once it runs out it shuts down and cannot be reached until someone plugs it in.' : null);
   }
