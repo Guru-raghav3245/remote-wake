@@ -21,3 +21,6 @@ app/vendor/
 
 # private notes with personal details (IPs, accounts); Claude Code reads it locally
 CLAUDE.local.md
+
+# Gradle caches
+.gradle/
