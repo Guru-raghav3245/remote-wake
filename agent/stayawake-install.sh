@@ -8,6 +8,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # the old agent sleeps the Mac when idle, which would fight this one
 launchctl bootout system/com.guru.wakeagent 2>/dev/null || true
 launchctl disable system/com.guru.wakeagent 2>/dev/null || true
+mkdir -p /usr/local/libexec; install -m 755 -o root -g wheel "$HERE/remotewake-blackbox.sh" /usr/local/libexec/remotewake-blackbox.sh
 install -m 644 -o root -g wheel "$HERE/com.guru.stayawake.plist" /Library/LaunchDaemons/com.guru.stayawake.plist
 launchctl enable system/com.guru.stayawake 2>/dev/null || true
 launchctl bootout system/com.guru.stayawake 2>/dev/null || true

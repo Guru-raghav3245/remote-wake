@@ -4,10 +4,11 @@
   <key>Label</key><string>com.guru.stayawake</string>
   <!-- Stay awake with the lid closed, on AC and on battery. `pmset disablesleep 1` is what blocks lid-close sleep on battery;
        it is a persistent system setting, so the script always puts it back to 0 when the daemon is stopped (TERM) or caffeinate ends.
-       caffeinate -s -i adds the normal sleep assertions (what the app reads). -->
+       caffeinate -s -i adds the normal sleep assertions (what the app reads).
+       remotewake-blackbox.sh logs battery/power/internet once a minute so the phone can explain an outage afterwards. -->
   <key>ProgramArguments</key><array>
     <string>/bin/sh</string><string>-c</string>
-    <string>C=; trap '[ -n "$C" ] &amp;&amp; kill $C; /usr/bin/pmset -a disablesleep 0; exit 0' TERM INT; /usr/bin/pmset -a disablesleep 1; /usr/bin/caffeinate -s -i &amp; C=$!; wait $C; /usr/bin/pmset -a disablesleep 0</string>
+    <string>C=; B=; trap '[ -n "$C" ] &amp;&amp; kill $C; [ -n "$B" ] &amp;&amp; kill $B; /usr/bin/pmset -a disablesleep 0; exit 0' TERM INT; /usr/bin/pmset -a disablesleep 1; /bin/sh /usr/local/libexec/remotewake-blackbox.sh &amp; B=$!; /usr/bin/caffeinate -s -i &amp; C=$!; wait $C; kill $B; /usr/bin/pmset -a disablesleep 0</string>
   </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
