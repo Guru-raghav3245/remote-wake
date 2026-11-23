@@ -38,7 +38,7 @@
 }
 @media(min-width:860px){:root{--rw:200px}}
 *{box-sizing:border-box}
-html{scroll-behavior:smooth;background:var(--bg)}
+html{scroll-padding-top:72px;scroll-behavior:smooth;background:var(--bg)}
 body{position:relative;margin:0;background:var(--bg);color:var(--text);font:400 15px/1.65 var(--mono);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit}
 h1,h2,h3{margin:0;line-height:1.2;font-weight:700}
@@ -57,7 +57,7 @@ code{color:var(--accent)}
 @media(max-width:859px){:root{--rw:0px}#rose{display:none}}
 
 /* nav */
-nav{display:flex;align-items:center;gap:var(--s5);padding:var(--s4) 0}
+nav{display:flex;align-items:center;gap:var(--s5);padding:var(--s4) 0;position:sticky;top:0;z-index:20;background:rgba(11,11,14,.5);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
 .brand{display:flex;align-items:center;gap:var(--s3);font-weight:700;font-size:16px;text-decoration:none}
 .brand img{width:36px;height:36px;border-radius:10px;display:block}
 nav .links{margin-left:auto;display:flex;gap:var(--s5)}
@@ -157,7 +157,6 @@ details[open]::details-content{block-size:auto;opacity:1}
 summary:after{transition:transform .28s ease}details[open] summary:after{transform:scale(1.08)}
 @media (prefers-reduced-motion:reduce){details::details-content,summary:after{transition:none}}
 footer{padding:var(--s7) 0;color:var(--muted);font-size:12px;display:grid;gap:var(--s3)}
-footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
 </style>
 </head>
 <body>
@@ -232,7 +231,6 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
 
   </main>
   <footer>
-    <div class="l"><a href="#download">Download</a></div>
     <p>Remote Wake is an independent project and is not affiliated with Tailscale. It bundles Tailscale (BSD-3-Clause) and tmux (ISC).</p>
   </footer>
 </div>
