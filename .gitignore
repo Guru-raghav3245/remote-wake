@@ -24,3 +24,7 @@ CLAUDE.local.md
 
 # Gradle caches
 .gradle/
+
+# release binaries served by the site (copied in at deploy time, never committed)
+site/*.apk
+site/*.dmg

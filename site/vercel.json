@@ -1,3 +1,9 @@
 {
-  "cleanUrls": true
+  "cleanUrls": true,
+  "headers": [
+    { "source": "/(Remote-Wake.dmg|RemoteWake.apk)", "headers": [
+      { "key": "Content-Disposition", "value": "attachment" },
+      { "key": "Cache-Control", "value": "public, max-age=3600" }
+    ] }
+  ]
 }
