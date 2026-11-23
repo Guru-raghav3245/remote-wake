@@ -183,7 +183,7 @@ footer{padding:var(--s7) 0;color:var(--muted);font-size:12px;display:grid;gap:va
 <div class="page">
   <nav>
     <a class="brand" href="/"><img src="/logo.png" alt="" width="36" height="36">Remote Wake</a>
-    <div class="links"><a href="#download">download</a><a href="#how">how it works</a><a href="#faq">faq</a><a href="mailto:master.guru.raghav@gmail.com" class="contact" id="contact">contact</a></div>
+    <div class="links"><a href="#how">how it works</a><a href="#download">download</a><a href="#faq">faq</a><a href="mailto:master.guru.raghav@gmail.com" class="contact" id="contact">contact</a></div>
   </nav>
 
   <main>
@@ -198,6 +198,18 @@ footer{padding:var(--s7) 0;color:var(--muted);font-size:12px;display:grid;gap:va
     </div>
     <div class="facts"><span>Free</span><span>Private: no servers of ours</span><span>Open source</span></div>
   </header>
+
+  <section id="how">
+    <div class="head"><h2>How it works</h2></div>
+    <ol class="steps">
+      <li class="step"><span class="num">1</span><div class="box"><h3>Install the apps</h3><div class="who"><span class="tag mac">mac</span><p>Open the downloaded file, drag Remote Wake to Applications and open it. Click <b>Install</b>. One password prompt sets up the stay-awake service and Tailscale.</p></div><div class="who"><span class="tag phone">phone</span><p>Open the downloaded file and allow installing from it. Then open Remote Wake.</p></div></div></li>
+      <li class="step"><span class="num">2</span><div class="box"><h3>Sign in to Tailscale</h3><div class="who"><span class="tag mac">mac</span><p>Click <b>Connect Tailscale</b> and sign in on the page that opens. A free account is enough.</p></div><div class="who"><span class="tag phone">phone</span><p>Tap <b>Sign in to Tailscale</b> and use the same account as on the Mac.</p></div></div></li>
+      <li class="step"><span class="num">3</span><div class="box"><h3>Plug in and check Wi-Fi</h3><div class="who"><span class="tag mac">mac</span><p>Connect the charger and make sure the Mac is on a Wi-Fi network it rejoins by itself. It also works on battery, but the Mac shuts down when the battery runs out.</p></div></div></li>
+      <li class="step key"><span class="num">4</span><div class="box"><h3>Turn on Stay awake<span class="imp">important</span></h3><div class="who"><span class="tag mac">mac</span><p>Switch <b>Stay awake</b> on. The big word in the app must say <b>AWAKE</b>. If it says ASLEEP, closing the lid puts the Mac to sleep and your phone cannot reach it.</p></div><div class="cmp"><span><i class="dot ok"></i><b class="ok">AWAKE</b> safe to close the lid</span><span><i class="dot bad"></i><b class="bad">ASLEEP</b> turn the switch on first</span></div></div></li>
+      <li class="step"><span class="num">5</span><div class="box"><h3>Close the lid</h3><div class="who"><span class="tag mac">mac</span><p>Once the app shows AWAKE, close the lid and walk away. The Mac keeps running with the screen off.</p></div></div></li>
+      <li class="step"><span class="num">6</span><div class="box"><h3>Tap your Mac on the phone</h3><div class="who"><span class="tag phone">phone</span><p>Your Mac shows up in the list. Type your Mac user name and you are in a real terminal. Allow background running when asked. About every 12 hours Tailscale asks for a one-tap approval.</p></div></div></li>
+    </ol>
+  </section>
 
   <section id="download">
     <div class="head"><h2>Download</h2><p class="muted">Version 0.4.0. Both downloads are free. You also need a free Tailscale account.</p></div>
@@ -214,18 +226,6 @@ footer{padding:var(--s7) 0;color:var(--muted);font-size:12px;display:grid;gap:va
       </div>
     </div>
     <div class="note"><b>Expect two warnings.</b> The apps are not yet signed with a paid developer certificate. On the Mac, right-click the app and choose Open the first time. On Android, allow installs from your browser, and tap "Install anyway" if Play Protect asks.</div>
-  </section>
-
-  <section id="how">
-    <div class="head"><h2>How it works</h2></div>
-    <ol class="steps">
-      <li class="step"><span class="num">1</span><div class="box"><h3>Install the apps</h3><div class="who"><span class="tag mac">mac</span><p>Open the downloaded file, drag Remote Wake to Applications and open it. Click <b>Install</b>. One password prompt sets up the stay-awake service and Tailscale.</p></div><div class="who"><span class="tag phone">phone</span><p>Open the downloaded file and allow installing from it. Then open Remote Wake.</p></div></div></li>
-      <li class="step"><span class="num">2</span><div class="box"><h3>Sign in to Tailscale</h3><div class="who"><span class="tag mac">mac</span><p>Click <b>Connect Tailscale</b> and sign in on the page that opens. A free account is enough.</p></div><div class="who"><span class="tag phone">phone</span><p>Tap <b>Sign in to Tailscale</b> and use the same account as on the Mac.</p></div></div></li>
-      <li class="step"><span class="num">3</span><div class="box"><h3>Plug in and check Wi-Fi</h3><div class="who"><span class="tag mac">mac</span><p>Connect the charger and make sure the Mac is on a Wi-Fi network it rejoins by itself. It also works on battery, but the Mac shuts down when the battery runs out.</p></div></div></li>
-      <li class="step key"><span class="num">4</span><div class="box"><h3>Turn on Stay awake<span class="imp">important</span></h3><div class="who"><span class="tag mac">mac</span><p>Switch <b>Stay awake</b> on. The big word in the app must say <b>AWAKE</b>. If it says ASLEEP, closing the lid puts the Mac to sleep and your phone cannot reach it.</p></div><div class="cmp"><span><i class="dot ok"></i><b class="ok">AWAKE</b> safe to close the lid</span><span><i class="dot bad"></i><b class="bad">ASLEEP</b> turn the switch on first</span></div></div></li>
-      <li class="step"><span class="num">5</span><div class="box"><h3>Close the lid</h3><div class="who"><span class="tag mac">mac</span><p>Once the app shows AWAKE, close the lid and walk away. The Mac keeps running with the screen off.</p></div></div></li>
-      <li class="step"><span class="num">6</span><div class="box"><h3>Tap your Mac on the phone</h3><div class="who"><span class="tag phone">phone</span><p>Your Mac shows up in the list. Type your Mac user name and you are in a real terminal. Allow background running when asked. About every 12 hours Tailscale asks for a one-tap approval.</p></div></div></li>
-    </ol>
   </section>
 
   <section>
