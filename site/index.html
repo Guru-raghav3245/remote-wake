@@ -165,7 +165,7 @@ footer{padding:var(--s7) 0;color:var(--muted);font-size:12px;display:grid;gap:va
 <div class="page">
   <nav>
     <a class="brand" href="/"><img src="/logo.png" alt="" width="36" height="36">Remote Wake</a>
-    <div class="links"><a href="#how">how it works</a><a href="#download">download</a><a href="#faq">faq</a><a href="mailto:master.guru.raghav@gmail.com" class="contact" id="contact">contact</a></div>
+    <div class="links"><a href="#download">download</a><a href="#how">how it works</a><a href="#faq">faq</a><a href="mailto:master.guru.raghav@gmail.com" class="contact" id="contact">contact</a></div>
   </nav>
 
   <main>
@@ -180,6 +180,23 @@ footer{padding:var(--s7) 0;color:var(--muted);font-size:12px;display:grid;gap:va
     </div>
     <div class="facts"><span>Free</span><span>Private: no servers of ours</span><span>Open source</span></div>
   </header>
+
+  <section id="download">
+    <div class="head"><h2>Download</h2><p class="muted">Version 0.4.0. Both downloads are free. You also need a free Tailscale account.</p></div>
+    <div class="dl">
+      <div class="card">
+        <h3>Remote Wake for Mac</h3>
+        <ul><li>Apple silicon Macs, macOS 13 or later</li><li>Includes Tailscale, so nothing else to install</li></ul>
+        <a class="abtn" data-act id="dl-mac" data-label="DOWNLOAD FOR MAC (.dmg)" href="/Remote-Wake.dmg" download>[ DOWNLOAD FOR MAC (.dmg) ]</a>
+      </div>
+      <div class="card">
+        <h3>Remote Wake for Android</h3>
+        <ul><li>64-bit ARM Android phones</li><li>Installed from the file, not from the Play Store</li></ul>
+        <a class="abtn" data-act id="dl-apk" data-label="DOWNLOAD FOR ANDROID (.apk)" href="/RemoteWake.apk" download>[ DOWNLOAD FOR ANDROID (.apk) ]</a>
+      </div>
+    </div>
+    <div class="note"><b>Expect two warnings.</b> The apps are not yet signed with a paid developer certificate. On the Mac, right-click the app and choose Open the first time. On Android, allow installs from your browser, and tap "Install anyway" if Play Protect asks.</div>
+  </section>
 
   <section id="how">
     <div class="head"><h2>Three steps, about five minutes</h2><p class="muted">Each app walks you through it and ticks every step off for you.</p></div>
@@ -199,22 +216,6 @@ footer{padding:var(--s7) 0;color:var(--muted);font-size:12px;display:grid;gap:va
     </div>
   </section>
 
-  <section id="download">
-    <div class="head"><h2>Download</h2><p class="muted">Version 0.4.0. Both downloads are free. You also need a free Tailscale account.</p></div>
-    <div class="dl">
-      <div class="card">
-        <h3>Remote Wake for Mac</h3>
-        <ul><li>Apple silicon Macs, macOS 13 or later</li><li>Includes Tailscale, so nothing else to install</li></ul>
-        <a class="abtn" data-act id="dl-mac" data-label="DOWNLOAD FOR MAC (.dmg)" href="/Remote-Wake.dmg" download>[ DOWNLOAD FOR MAC (.dmg) ]</a>
-      </div>
-      <div class="card">
-        <h3>Remote Wake for Android</h3>
-        <ul><li>64-bit ARM Android phones</li><li>Installed from the file, not from the Play Store</li></ul>
-        <a class="abtn" data-act id="dl-apk" data-label="DOWNLOAD FOR ANDROID (.apk)" href="/RemoteWake.apk" download>[ DOWNLOAD FOR ANDROID (.apk) ]</a>
-      </div>
-    </div>
-    <div class="note"><b>Expect two warnings.</b> The apps are not yet signed with a paid developer certificate. On the Mac, right-click the app and choose Open the first time. On Android, allow installs from your browser, and tap "Install anyway" if Play Protect asks.</div>
-  </section>
 
   <section id="faq">
     <div class="head"><h2>Questions</h2></div>
