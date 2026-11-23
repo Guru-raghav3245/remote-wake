@@ -89,8 +89,24 @@ section{padding:var(--s7) 0}
 .head h2:before{content:"> ";color:var(--pink)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:var(--s5)}
 .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--s4)}
-.mark{font-size:13px;color:var(--accent);margin-bottom:var(--s3);display:block}
 .card p{color:var(--muted);margin-top:var(--s2);font-size:14px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:var(--s4);max-width:760px}
+.step{position:relative;padding-left:56px}
+.step:not(:last-child):before{content:"";position:absolute;left:17px;top:40px;bottom:calc(-1 * var(--s4) - 4px);width:1px;background:var(--line)}
+.step .num{position:absolute;left:0;top:0;width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--accent);font-size:14px;font-weight:700}
+.step .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:var(--s4) var(--s5)}
+.step h3{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap}
+.step .who{display:grid;grid-template-columns:56px 1fr;gap:var(--s3);margin-top:var(--s3);align-items:start}
+.step .who p{color:var(--muted);font-size:14px;margin:0}.step .who b{color:var(--text);font-weight:600}
+.step .tag{font-size:11px;line-height:1;padding:5px 0;border:1px solid var(--line);border-radius:6px;color:var(--muted);text-align:center;margin-top:3px}
+.step .imp{font-size:11px;font-weight:600;color:var(--pink);border:1px solid rgba(255,106,193,.4);border-radius:6px;padding:3px 8px}
+.step.key .num{color:var(--pink);border-color:rgba(255,106,193,.5)}
+.step.key .box{border-color:rgba(123,224,176,.45);box-shadow:0 0 32px rgba(123,224,176,.1)}
+.step .cmp{display:flex;flex-wrap:wrap;gap:var(--s3) var(--s5);margin-top:var(--s4);padding:var(--s3) var(--s4);background:var(--stage);border:1px solid var(--line);border-radius:10px;font-size:13px;color:var(--muted)}
+.step .cmp span{display:flex;align-items:center;gap:var(--s2)}.step .cmp b{font-weight:700;margin-right:var(--s1)}
+.step .cmp .dot{margin:0;width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
+.step .ok{color:var(--accent)}.step .bad{color:var(--danger)}
+@media(max-width:560px){.step{padding-left:48px}.step .num{width:32px;height:32px}.step:not(:last-child):before{left:15px}.step .who{grid-template-columns:1fr;gap:var(--s2)}.step .tag{justify-self:start;padding:5px 10px;margin-top:0}}
 
 /* app mockups */
 .mac{width:420px;max-width:100%;border:1px solid var(--line);border-radius:14px;background:var(--bg);overflow:hidden}
@@ -199,12 +215,15 @@ footer{padding:var(--s7) 0;color:var(--muted);font-size:12px;display:grid;gap:va
   </section>
 
   <section id="how">
-    <div class="head"><h2>Three steps, about five minutes</h2><p class="muted">Each app walks you through it and ticks every step off for you.</p></div>
-    <div class="grid3">
-      <div class="card"><span class="mark">[x] 1</span><h3>Set up your Mac</h3><p>Install Remote Wake, connect Tailscale (a free account) and turn on "Stay awake". One password prompt.</p></div>
-      <div class="card"><span class="mark">[>] 2</span><h3>Install the phone app</h3><p>Sideload the Android app and sign in to Tailscale with the same account.</p></div>
-      <div class="card"><span class="mark">[ ] 3</span><h3>Tap your Mac</h3><p>Your Mac shows up in the list. Type your user name and you are in a real terminal.</p></div>
-    </div>
+    <div class="head"><h2>How it works</h2></div>
+    <ol class="steps">
+      <li class="step"><span class="num">1</span><div class="box"><h3>Install the apps</h3><div class="who"><span class="tag">mac</span><p>Open the downloaded file, drag Remote Wake to Applications and open it. Click <b>Install</b>. One password prompt sets up the stay-awake service and Tailscale.</p></div><div class="who"><span class="tag">phone</span><p>Open the downloaded file and allow installing from it. Then open Remote Wake.</p></div></div></li>
+      <li class="step"><span class="num">2</span><div class="box"><h3>Sign in to Tailscale</h3><div class="who"><span class="tag">mac</span><p>Click <b>Connect Tailscale</b> and sign in on the page that opens. A free account is enough.</p></div><div class="who"><span class="tag">phone</span><p>Tap <b>Sign in to Tailscale</b> and use the same account as on the Mac.</p></div></div></li>
+      <li class="step"><span class="num">3</span><div class="box"><h3>Plug in and check Wi-Fi</h3><div class="who"><span class="tag">mac</span><p>Connect the charger and make sure the Mac is on a Wi-Fi network it rejoins by itself. It also works on battery, but the Mac shuts down when the battery runs out.</p></div></div></li>
+      <li class="step key"><span class="num">4</span><div class="box"><h3>Turn on Stay awake<span class="imp">important</span></h3><div class="who"><span class="tag">mac</span><p>Switch <b>Stay awake</b> on. The big word in the app must say <b>AWAKE</b>. If it says ASLEEP, closing the lid puts the Mac to sleep and your phone cannot reach it.</p></div><div class="cmp"><span><i class="dot ok"></i><b class="ok">AWAKE</b> safe to close the lid</span><span><i class="dot bad"></i><b class="bad">ASLEEP</b> turn the switch on first</span></div></div></li>
+      <li class="step"><span class="num">5</span><div class="box"><h3>Close the lid</h3><div class="who"><span class="tag">mac</span><p>Once the app shows AWAKE, close the lid and walk away. The Mac keeps running with the screen off.</p></div></div></li>
+      <li class="step"><span class="num">6</span><div class="box"><h3>Tap your Mac on the phone</h3><div class="who"><span class="tag">phone</span><p>Your Mac shows up in the list. Type your Mac user name and you are in a real terminal. Allow background running when asked. About every 12 hours Tailscale asks for a one-tap approval.</p></div></div></li>
+    </ol>
   </section>
 
   <section>
