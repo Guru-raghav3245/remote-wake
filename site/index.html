@@ -120,29 +120,37 @@ section{padding:var(--s7) 0}
 .keys{display:flex;gap:var(--s2);flex-wrap:wrap}
 .keys span{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:var(--s1) var(--s3);font-size:12px;font-weight:600}
 
-/* the Mac app peeking in from the right edge of the screen: drawn at its real size (884 px wide), scaled down, about 70% visible */
+/* the Mac app peeking in from the right edge: a pixel-faithful copy of the real window (884 x 562 pt, measured from a screenshot and the SwiftUI source), scaled by script */
 .peek{display:none;position:absolute;top:140px;left:calc(100vw - 470px);width:884px;transform:scale(.72);transform-origin:top left;z-index:0;pointer-events:none}
-.peek .mac{width:884px;max-width:none;border-radius:12px;box-shadow:0 30px 90px rgba(0,0,0,.65),0 0 60px rgba(123,224,176,.05)}
-.peek .bar{height:44px;padding:0 16px;gap:8px}
-.peek .bar i{width:13px;height:13px}
-.peek .bar b{margin-left:var(--s3);font-weight:600;font-size:13px;color:var(--muted)}
-.peek .body{padding:32px;gap:24px}
-.peek .two{display:grid;grid-template-columns:540px 280px;gap:24px;align-items:start}
-.peek .hero2{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:12px}
-.peek .stage{padding:0;border-radius:12px;height:124px;display:grid;place-items:center;overflow:hidden}
-.asc{margin:0;font:9.5px/7px var(--mono);color:var(--accent);white-space:pre;text-shadow:0 0 6px rgba(123,224,176,.35)}
-.peek .pathl{font-size:12px;white-space:pre;color:var(--muted)}
-.peek .act{display:flex;gap:16px;align-items:center}.peek .act .abtn{flex:none}
-.peek .act p{font-size:13px;color:var(--muted)}
-.peek .rd{background:var(--card);border:1px solid var(--line);border-radius:14px}
-.peek .rd div{padding:12px 16px}
+.peek .mac{letter-spacing:.0145em;width:884px;max-width:none;border:0;border-radius:17px;background:var(--bg);box-shadow:0 30px 90px rgba(0,0,0,.65),0 0 0 .5px rgba(255,255,255,.14),0 0 60px rgba(123,224,176,.05)}
+.peek .bar{height:32.5px;box-sizing:border-box;background:#232323;border-bottom:.5px solid #1c1c1f;padding:0 9px;gap:9px;align-items:center}
+.peek .bar i{width:14px;height:14px}.peek .bar i:nth-child(1){background:#e16557}.peek .bar i:nth-child(2){background:#f3c11f}.peek .bar i:nth-child(3){background:#5cbc1e}
+.peek .bar b{margin-left:6.5px;font:600 13px/1 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#9f9f9f}
+.peek .body{padding:24px;gap:24px;display:grid}
+.peek .mhead{margin-bottom:-1px;display:flex;align-items:center;gap:12px;font:700 22px/1.2 var(--mono);color:var(--text)}
+.peek .mhead img{width:36px;height:36px;border-radius:0}
+.peek .mhead .help{margin-left:auto;font:500 13px/1 var(--mono);color:var(--muted)}
+.peek .two{display:grid;grid-template-columns:540px 280px;gap:16px;align-items:start}
+.peek .hero2{background:var(--card);box-shadow:inset 0 0 0 1px var(--line);border-radius:14px;padding:16px;display:grid;gap:12px}
+.peek .stage{position:relative;background:var(--stage);border:0;border-radius:10px;padding:0;height:120px;overflow:hidden}.peek .stage::after{content:"";position:absolute;inset:0;border:1px solid var(--line);border-radius:10px}.peek .stage canvas{display:block;width:100%;height:100%}
+.peek .pathl{font:11px/14.5px var(--mono);white-space:pre;color:var(--muted)}
+.peek .pathl .m{color:var(--muted)}.peek .dsh{letter-spacing:0}
+.peek .act{display:flex;gap:16px;align-items:center}
+.peek .act .abtn{flex:none;letter-spacing:.0125em;font:700 13px/16px var(--mono);padding:4px 8px;border-radius:4px;box-shadow:none;background:transparent;color:var(--muted)}
+.peek .act p{font:400 12px/15px var(--mono);color:var(--muted);margin:0 -4px 0 0}
+.peek .rd{padding-top:1px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line);border-radius:14px}
+.peek .rd div{padding:12px}
 .peek .rd div+div{border-top:1px solid var(--line)}
-.peek .rd small{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}
-.peek .rd span{font-size:13px}
-.peek .lg{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 0;font-size:13px}
-.peek .lg div{display:grid;grid-template-columns:36px 84px 110px 1fr;padding:6px 16px;gap:4px}
-.peek .lg .n{color:var(--dim)}.peek .lg .t{color:var(--muted)}
-.peek .lg .you{background:rgba(255,106,193,.08);box-shadow:inset 2px 0 var(--pink)}
+.peek .rd small{display:block;font:11px/14px var(--mono);color:var(--muted);margin-bottom:4px}
+.peek .rd .v{display:flex;align-items:center;gap:8px;height:16px;font:12px/16px var(--mono);color:var(--text);white-space:nowrap;overflow:hidden}
+.peek .rd .v b{font:600 13px/16px var(--mono)}
+.peek .abtn .t,.peek .abtn .b{font-size:13px;line-height:16px}
+.peek .dot{width:8px;height:8px;margin:0;flex:none;border-radius:50%;background:currentColor;box-shadow:0 0 4px currentColor}
+.peek .ok{color:var(--accent)}.peek .bad{color:var(--danger)}.peek .wn{color:var(--warn)}
+.peek .lg{background:var(--card);box-shadow:inset 0 0 0 1px var(--line);border-radius:14px;padding:8px 0;height:148px;box-sizing:border-box;font:11.5px/22px var(--mono)}
+.peek .lg div{display:flex;gap:8px;height:22px;padding:0 12px 0 11px;white-space:pre;color:var(--text)}
+.peek .lg .n,.peek .lg .t{color:var(--dim)}.peek .lg .g{width:64px;flex:none}
+.peek .lg .you{border-radius:0 11px 11px 0;background:rgba(255,106,193,.10);box-shadow:inset 2px 0 var(--pink)}
 
 /* download */
 .dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:var(--s4)}
@@ -267,25 +275,27 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
   <div class="mac">
     <div class="bar"><i></i><i></i><i></i><b>Remote Wake</b></div>
     <div class="body">
-      <div class="mhead"><img src="/logo.png" alt="" width="36" height="36">Remote Wake<span class="muted" style="margin-left:auto;font-size:13px;font-weight:400">Help</span></div>
+      <div class="mhead"><img src="/logo.png" alt="" width="36" height="36">Remote Wake<span class="help">Help</span></div>
       <div class="two">
         <div class="hero2">
-          <div class="stage"><pre class="asc" id="asc">AWAKE</pre></div>
-          <div class="pathl">[phone] ------------------o------------------ [mac awake]</div>
-          <div class="act"><a class="abtn quiet" data-label="STAY AWAKE: ON" tabindex="-1">[ STAY AWAKE: ON ]</a><p>Your Mac stays awake with the lid closed, plugged in or not.</p></div>
+          <div class="stage"><canvas id="asc" width="1016" height="240" role="img" aria-label="AWAKE"></canvas></div>
+          <div class="pathl"><span class="m">[phone] </span><span class="ok"><span class="dsh">──────────────────────●───────</span> [mac awake]</span></div>
+          <div class="act"><a class="abtn quiet" data-label="STOP STAYING AWAKE" tabindex="-1">[ STOP STAYING AWAKE ]</a><p>Safe to close the lid. Keep it plugged in for long stays.</p></div>
         </div>
         <div class="rd">
-          <div><small>power</small><span><span class="dot"></span>AC plugged in</span></div>
-          <div><small>tailscale</small><span><span class="dot"></span>running 100.x.x.x</span></div>
-          <div><small>phone</small><span><span class="dot"></span>online my-phone</span></div>
-          <div><small>phone sessions</small><span><span class="dot"></span>ready always on</span></div>
+          <div><small>power</small><span class="v"><span class="dot ok"></span><b class="ok">AC</b>plugged in</span></div>
+          <div><small>tailscale</small><span class="v"><span class="dot ok"></span><b class="ok">running</b>100.64.0.12</span></div>
+          <div><small>phone</small><span class="v"><span class="dot ok"></span><b class="ok">online</b>my-phone</span></div>
+          <div><small>phone sessions</small><span class="v"><span class="dot ok"></span><b class="ok">ready</b>always on</span></div>
         </div>
       </div>
       <div class="lg">
-        <div><span class="n">1</span><span class="t">21:53:38</span><span style="color:var(--accent)">app</span><span>Remote Wake started</span></div>
-        <div><span class="n">2</span><span class="t">21:53:38</span><span style="color:var(--accent)">tailscale</span><span>running &middot; 100.x.x.x</span></div>
-        <div><span class="n">3</span><span class="t">21:53:40</span><span style="color:var(--accent)">phone</span><span>my-phone online</span></div>
-        <div class="you"><span class="n">4</span><span class="t">21:54:02</span><span style="color:var(--pink)">you</span><span>stay awake on</span></div>
+        <div><span class="n">  1</span><span class="t">15:51:46</span><span class="g ok">tailscale</span>running &middot; 100.64.0.12</div>
+        <div><span class="n">  2</span><span class="t">15:51:46</span><span class="g wn">phone</span>my-phone offline</div>
+        <div><span class="n">  3</span><span class="t">15:51:46</span><span class="g ok">app</span>Remote Wake started</div>
+        <div><span class="n">  4</span><span class="t">15:51:46</span><span class="g ok">tailscale</span>running &middot; 100.64.0.12</div>
+        <div><span class="n">  5</span><span class="t">15:51:46</span><span class="g ok">daemon</span>stay awake on</div>
+        <div class="you"><span class="n">  6</span><span class="t">15:52:01</span><span class="g ok">phone</span>my-phone online</div>
       </div>
     </div>
   </div>
@@ -299,24 +309,32 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
     var l=a.getAttribute("data-label"),n=l.length+6;
     a.setAttribute("aria-label",l.toLowerCase().replace(/^./,function(c){return c.toUpperCase()}));
     a.innerHTML='<span aria-hidden="true" class="t"></span><span aria-hidden="true">|  '+l+'  |</span><span aria-hidden="true" class="b"></span>';
-    a._n=Math.round(n*13/7);draw(a,0);   // border runs at 7px, so it needs 13/7 as many characters to span the label line
+    a._n=a.closest(".peek")?n:Math.round(n*13/7);draw(a,0);   // border runs at 7px, so it needs 13/7 as many characters to span the label line
   });
   function line(n,t,k){var s="+";for(var i=1;i<n-1;i++){s+=k?RAMP[Math.floor((Math.sin(i*.55-t*.3+k)+1)/2*9)]:"-"}return s+"+"}
   function draw(a,t){var act=a.hasAttribute("data-act")&&!calm;a.querySelector(".t").textContent=line(a._n,t,act?1:0);a.querySelector(".b").textContent=line(a._n,t,act?2.4:0)}
   if(!calm){var t=0;setInterval(function(){t++;btns.forEach(function(a){if(a.hasAttribute("data-act"))draw(a,t)})},110)}
 })();
 
-/* ---------- the status word in the Mac mock: rasterised into a character grid, as in the app ---------- */
+/* ---------- the status word in the Mac mock: the app's own character grid (made by its makeWord with the system font, so it is exact on every browser), drawn and swept by light as the app's Canvas does ---------- */
 (function(){
-  var el=document.getElementById("asc");if(!el)return;
-  var word="AWAKE",C=88,R=12,RAMP=" .:-=+*#%@",cv=document.createElement("canvas");cv.width=C;cv.height=R;
-  var x=cv.getContext("2d");x.fillStyle="#fff";x.font="900 "+R*1.02+"px ui-sans-serif,Helvetica,Arial,sans-serif";x.textBaseline="alphabetic";
-  var xs=1.23,gap=2,ws=[].map.call(word,function(c){return x.measureText(c).width*xs}),tot=ws.reduce(function(a,b){return a+b},0)+gap*(word.length-1),px=(C-tot)/2;
-  x.setTransform(xs,0,0,1,0,0);
-  for(var i=0;i<word.length;i++){x.fillText(word[i],px/xs,R*.86);px+=ws[i]+gap}
-  var d=x.getImageData(0,0,C,R).data,out="";
-  for(var r=0;r<R;r++){for(var c=0;c<C;c++){var a=d[(r*C+c)*4+3]/255;out+=a<.12?" ":RAMP[Math.min(9,Math.floor(3+a*5.99))]}out+="\n"}
-  el.textContent=out;
+  var cv=document.getElementById("asc");if(!cv)return;
+  var G=["0000000002222200000022222002222200222220000000222000000002222200022221000222222222000000","0000000012222210000022222002222200222220000002222200000002222201222220000222222222100000","0000000022222220000012222012222210222210000012222210000002222212222200000222211111000000","0000000022222220000002222122222221222200000022222220000002222222222000000222200000000000","0000000222212222000002222222222222222200000022212220000002222222220000000222222222000000","0000000222101222000001222222222222222100000122202221000002222222220000000222222222000000","0000001222222222100000222222222222222000000222222222000002222222222000000222222221000000","0000002222222222200000222222212222222000001222222222100002222222222200000222200000000000","0000012222111222210000122222101222221000002222111222200002222202222210000222211111000000","0000022220000022220000022222000222220000012221000122210002222201222221000222222222100000","0000022210000012220000022222000222220000022220000022220002222200122222000222222222100000","0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"],R=G.length,C=88,CW=5.7,CH=7,RAMP=" .:-=+*#%@",W=508,H=120,x=cv.getContext("2d"),calm=matchMedia("(prefers-reduced-motion: reduce)").matches,col="#7BE0B0";
+  var k=cv.width/W;
+  function draw(t){
+    x.setTransform(k,0,0,k,0,0);x.clearRect(0,0,W,H);
+    var seed=7;function rnd(){seed=(seed*16807)%2147483647;return seed/2147483647}
+    for(var i=0;i<60;i++){var px=rnd()*W,py=rnd()*H;x.globalAlpha=.4;x.fillStyle="#fff";x.fillRect(px,py,1,1);
+      if(i%12===0){var a=.5+.5*Math.sin(t*2+i);x.globalAlpha=.3*a;x.strokeStyle="#fff";x.lineWidth=1;x.beginPath();x.moveTo(px-6,py);x.lineTo(px+6,py);x.moveTo(px,py-6);x.lineTo(px,py+6);x.stroke()}}
+    x.font="9.5px ui-monospace,'SF Mono',Menlo,Consolas,monospace";x.textBaseline="top";x.fillStyle=col;
+    var ox=(W-C*CW)/2,oy=(H-R*CH)/2,sw=(t*.12)%1.6-.3;
+    for(var r=0;r<R;r++)for(var c=0;c<C;c++){if(G[r][c]==="0")continue;
+      var lit=Math.max(0,1-Math.abs(c/C-sw)*4),b=Math.min(1,.5+r/R*.15+lit*.4);
+      x.globalAlpha=.45+.55*b;x.fillText(RAMP[Math.min(9,Math.floor(b*10))],ox+c*CW,oy+r*CH+2)}
+    x.globalAlpha=1;
+  }
+  draw(8);
+  if(!calm){var last=0;(function f(ms){requestAnimationFrame(f);if(ms-last<66||!cv.offsetParent)return;last=ms;draw(ms/1000)})(0)}
 })();
 
 /* ---------- the Mac window at the right edge: sized to the room beside the headline, about 75% visible ---------- */
