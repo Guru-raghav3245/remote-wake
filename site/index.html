@@ -175,6 +175,7 @@ details[open]::details-content{block-size:auto;opacity:1}
 summary:after{transition:transform .28s ease}details[open] summary:after{transform:scale(1.08)}
 @media (prefers-reduced-motion:reduce){details::details-content,summary:after{transition:none}}
 footer{padding:var(--s7) 0;color:var(--muted);font-size:12px;display:grid;gap:var(--s3)}
+footer .guides a{color:var(--muted)}footer .guides a:hover{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -253,6 +254,7 @@ footer{padding:var(--s7) 0;color:var(--muted);font-size:12px;display:grid;gap:va
 
   </main>
   <footer>
+    <p class="guides">Guides: <a href="/wake-sleeping-mac-from-android">wake a sleeping Mac from your phone?</a> &middot; <a href="/ssh-into-mac-from-android">SSH into your Mac from Android</a> &middot; <a href="/keep-mac-awake-lid-closed">keep a Mac awake with the lid closed</a> &middot; <a href="/use-claude-code-from-your-phone">Claude Code from your phone</a></p>
     <p>Remote Wake is an independent project and is not affiliated with Tailscale. It bundles Tailscale (BSD-3-Clause) and tmux (ISC).</p>
   </footer>
 </div>
