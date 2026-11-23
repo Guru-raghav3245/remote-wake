@@ -93,7 +93,6 @@ section{padding:var(--s7) 0}
 .card p{color:var(--muted);margin-top:var(--s2);font-size:14px}
 
 /* app mockups */
-.shots{display:flex;flex-wrap:wrap;gap:var(--s5);align-items:flex-start;margin-top:var(--s6)}
 .mac{width:420px;max-width:100%;border:1px solid var(--line);border-radius:14px;background:var(--bg);overflow:hidden}
 .mac .bar{height:32px;background:var(--card);display:flex;gap:7px;align-items:center;padding:0 var(--s3);border-bottom:1px solid var(--line)}
 .mac .bar i{width:10px;height:10px;border-radius:50%;background:var(--line)}
@@ -102,23 +101,7 @@ section{padding:var(--s7) 0}
 .mhead{display:flex;align-items:center;gap:var(--s3);font-weight:700;font-size:18px}
 .mhead img{width:32px;height:32px;border-radius:9px}
 .stage{background:var(--stage);border:1px solid var(--line);border-radius:12px;padding:var(--s5) var(--s3);text-align:center}
-.word{font-size:34px;font-weight:800;letter-spacing:.22em;margin-right:-.22em;color:var(--accent);text-shadow:0 0 22px rgba(123,224,176,.45)}
-.word.off{color:var(--danger);text-shadow:0 0 22px rgba(229,72,69,.4)}
-.reads{border:1px solid var(--line);border-radius:12px;background:var(--card)}
-.read{display:flex;gap:var(--s3);align-items:center;padding:var(--s3) var(--s4);font-size:13px}
-.read+.read{border-top:1px solid var(--line)}
-.read .k{color:var(--muted);width:116px;flex:none}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);margin-right:var(--s2)}
-.phone{width:262px;border:2px solid var(--line);border-radius:30px;background:var(--bg);padding:var(--s4);display:grid;gap:var(--s3)}
-.phone .t{display:flex;align-items:center;gap:var(--s3);font-weight:700;font-size:15px;padding:var(--s1) 0}
-.phone .t img{width:26px;height:26px;border-radius:8px}
-.phone .stage{padding:var(--s3)}
-.phone .word{font-size:20px}
-.pc{display:flex;align-items:center;gap:var(--s3);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:var(--s3);font-size:13px}
-.pc b{display:block;font-size:14px}
-.term{background:var(--stage);border:1px solid var(--line);border-radius:10px;padding:var(--s3);font-size:12px;line-height:1.6}
-.keys{display:flex;gap:var(--s2);flex-wrap:wrap}
-.keys span{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:var(--s1) var(--s3);font-size:12px;font-weight:600}
 
 /* the Mac app peeking in from the right edge: a pixel-faithful copy of the real window (884 x 562 pt, measured from a screenshot and the SwiftUI source), scaled by script */
 .peek{display:none;position:absolute;top:140px;left:calc(100vw - 470px);width:884px;transform:scale(.72);transform-origin:top left;z-index:0;pointer-events:none}
@@ -199,29 +182,6 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
       <div class="card"><span class="mark">[x] 1</span><h3>Set up your Mac</h3><p>Install Remote Wake, connect Tailscale (a free account) and turn on "Stay awake". One password prompt.</p></div>
       <div class="card"><span class="mark">[>] 2</span><h3>Install the phone app</h3><p>Sideload the Android app and sign in to Tailscale with the same account.</p></div>
       <div class="card"><span class="mark">[ ] 3</span><h3>Tap your Mac</h3><p>Your Mac shows up in the list. Type your user name and you are in a real terminal.</p></div>
-    </div>
-
-    <div class="shots" aria-label="What the apps look like">
-      <div class="mac" role="img" aria-label="The Mac app showing the Mac awake">
-        <div class="bar"><i></i><i></i><i></i></div>
-        <div class="body">
-          <div class="mhead"><img src="/logo.png" alt="" width="32" height="32">Remote Wake</div>
-          <div class="stage"><div class="word">AWAKE</div><div class="muted" style="font-size:12px;margin-top:var(--s3)">[phone] ---o--- [mac awake]</div></div>
-          <div class="reads">
-            <div class="read"><span class="k">power</span><span><span class="dot"></span>AC plugged in</span></div>
-            <div class="read"><span class="k">tailscale</span><span><span class="dot"></span>running 100.x.x.x</span></div>
-            <div class="read"><span class="k">phone</span><span><span class="dot"></span>online</span></div>
-            <div class="read"><span class="k">phone sessions</span><span><span class="dot"></span>ready</span></div>
-          </div>
-        </div>
-      </div>
-      <div class="phone" role="img" aria-label="The Android app with a terminal open on the Mac">
-        <div class="t"><img src="/logo.png" alt="" width="26" height="26">remote-wake</div>
-        <div class="stage"><div class="word">ONLINE</div></div>
-        <div class="pc"><div><b>my-macbook</b><span style="color:var(--accent)"><span class="dot"></span>online</span></div></div>
-        <div class="term">my-macbook ~ %<br>$ cd Des<span style="color:var(--pink)">&#9608;</span><br><span style="color:var(--accent)">cd Desktop/</span></div>
-        <div class="keys"><span>Esc</span><span>Tab</span><span>Ctrl</span><span>^C</span></div>
-      </div>
     </div>
   </section>
 
