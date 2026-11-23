@@ -63,7 +63,7 @@ nav{display:flex;align-items:center;gap:var(--s5);padding:var(--s4) 0}
 nav .links{margin-left:auto;display:flex;gap:var(--s5)}
 nav .links a{text-decoration:none;color:var(--muted);font-size:13px}
 nav .links a:hover{color:var(--accent)}
-@media(max-width:640px){nav .links{display:none}}
+@media(max-width:640px){nav .links a:not(.contact){display:none}}
 
 /* ASCII buttons: frame drawn by script from data-label; the top and bottom rows ripple on the main action */
 .abtn{display:inline-block;font:600 13px/1.2 var(--mono);white-space:pre;text-decoration:none;color:var(--accent);background:rgba(123,224,176,.07);padding:6px 8px;border-radius:6px;box-shadow:0 0 18px rgba(123,224,176,.12);cursor:pointer;text-align:left;max-width:100%;overflow:hidden}
@@ -166,7 +166,7 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
 <div class="page">
   <nav>
     <a class="brand" href="/"><img src="/logo.png" alt="" width="36" height="36">Remote Wake</a>
-    <div class="links"><a href="#how">how it works</a><a href="#download">download</a><a href="#faq">faq</a></div>
+    <div class="links"><a href="#how">how it works</a><a href="#download">download</a><a href="#faq">faq</a><a href="mailto:master.guru.raghav@gmail.com" class="contact" id="contact">contact</a></div>
   </nav>
 
   <main>
@@ -393,6 +393,23 @@ footer .l{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5)}
   function kick(){want();if(!raf)raf=requestAnimationFrame(frame)}
   addEventListener("scroll",kick,{passive:true});addEventListener("resize",function(){size();kick()});
   size();want();spin=target;draw();
+})();
+</script>
+<script>
+/* contact: laptop = Gmail compose in a new tab; Android = mailto (opens the Gmail app, the usual default); iPhone = the Gmail app, falling back to mailto if it is not installed */
+(function(){
+  var a=document.getElementById("contact");if(!a)return;
+  var to="master.guru.raghav@gmail.com",ua=navigator.userAgent,ios=/iPhone|iPad|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1),android=/Android/.test(ua);
+  a.addEventListener("click",function(e){
+    if(android)return;                       // plain mailto: hands over to the phone's mail app
+    e.preventDefault();
+    if(ios){
+      var t=setTimeout(function(){location.href="mailto:"+to},1200);   // Gmail app missing: the page stays visible, so fall back
+      addEventListener("pagehide",function(){clearTimeout(t)},{once:true});
+      document.addEventListener("visibilitychange",function(){if(document.hidden)clearTimeout(t)},{once:true});
+      location.href="googlegmail:///co?to="+encodeURIComponent(to);
+    }else window.open("https://mail.google.com/mail/?view=cm&fs=1&to="+encodeURIComponent(to),"_blank","noopener");
+  });
 })();
 </script>
 </body>
