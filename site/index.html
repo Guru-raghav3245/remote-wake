@@ -183,7 +183,7 @@ footer{padding:var(--s7) 0;color:var(--muted);font-size:12px;display:grid;gap:va
 <div class="page">
   <nav>
     <a class="brand" href="/"><img src="/logo.png" alt="" width="36" height="36">Remote Wake</a>
-    <div class="links"><a href="#how">how it works</a><a href="#download">download</a><a href="#faq">faq</a><a href="mailto:master.guru.raghav@gmail.com" class="contact" id="contact">contact</a></div>
+    <div class="links"><a href="#how">how it works</a><a href="#download">download</a><a href="#faq">faq</a><a href="mailto:master.guru.raghav@gmail.com?subject=Remote%20Wake%20Query" class="contact" id="contact">contact</a></div>
   </nav>
 
   <main>
@@ -419,16 +419,16 @@ footer{padding:var(--s7) 0;color:var(--muted);font-size:12px;display:grid;gap:va
 /* contact: laptop = Gmail compose in a new tab; Android = mailto (opens the Gmail app, the usual default); iPhone = the Gmail app, falling back to mailto if it is not installed */
 (function(){
   var a=document.getElementById("contact");if(!a)return;
-  var to="master.guru.raghav@gmail.com",ua=navigator.userAgent,ios=/iPhone|iPad|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1),android=/Android/.test(ua);
+  var to="master.guru.raghav@gmail.com",sub="Remote Wake Query",ua=navigator.userAgent,ios=/iPhone|iPad|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1),android=/Android/.test(ua);
   a.addEventListener("click",function(e){
     if(android)return;                       // plain mailto: hands over to the phone's mail app
     e.preventDefault();
     if(ios){
-      var t=setTimeout(function(){location.href="mailto:"+to},1200);   // Gmail app missing: the page stays visible, so fall back
+      var t=setTimeout(function(){location.href="mailto:"+to+"?subject="+encodeURIComponent(sub)},1200);   // Gmail app missing: the page stays visible, so fall back
       addEventListener("pagehide",function(){clearTimeout(t)},{once:true});
       document.addEventListener("visibilitychange",function(){if(document.hidden)clearTimeout(t)},{once:true});
-      location.href="googlegmail:///co?to="+encodeURIComponent(to);
-    }else window.open("https://mail.google.com/mail/?view=cm&fs=1&to="+encodeURIComponent(to),"_blank","noopener");
+      location.href="googlegmail:///co?to="+encodeURIComponent(to)+"&subject="+encodeURIComponent(sub);
+    }else window.open("https://mail.google.com/mail/?view=cm&fs=1&to="+encodeURIComponent(to)+"&su="+encodeURIComponent(sub),"_blank","noopener");
   });
 })();
 </script>
