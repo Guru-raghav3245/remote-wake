@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:archive/archive_io.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -40,10 +41,40 @@ Future<(File, String)> fetchMacFile(String ip, String user, String path) async {
     final r = await Engine.fetch('$ip:22', user, pin, _FilesPageState.viaTmux(cmd), pdf);
     if (r.isEmpty && File(pdf).lengthSync() > 0) return (File(pdf), '${name.substring(0, name.length - e.length)}pdf');
   }
-  final f = '${d.path}/$name';
+  // a web page gets its own folder per Mac folder, so the files it links to can sit beside it
+  final dir = path.substring(0, path.lastIndexOf('/') + 1);
+  final into = _html.contains(e) ? (Directory('${d.path}/p${dir.hashCode.toUnsigned(32)}')..createSync()).path : d.path;
+  final f = '$into/$name';
   final r = await Engine.fetch('$ip:22', user, pin, _FilesPageState.viaTmux('cat ${_q(path)}'), f);
   if (r.isNotEmpty) throw r.replaceFirst('ERROR: ', '');
+  if (_html.contains(e)) await _fetchPageFiles(ip, user, pin, dir, File(f));
   return (File(f), name);
+}
+
+// Top-level names a page links to by relative path (src="katex/katex.min.js" -> katex), skipping web links, anchors and ../ paths.
+Set<String> pageLinks(String html) => RegExp(r'''(?:src|href)\s*=\s*["']([^"'#?]+)''', caseSensitive: false)
+    .allMatches(html).map((m) => Uri.decodeFull(m[1]!.trim()).replaceFirst(RegExp(r'^(\./)+'), ''))
+    .where((u) => !u.contains(':') && !u.startsWith('/') && !u.startsWith('..'))
+    .map((u) => u.split('/').first).where((u) => u.isNotEmpty && u != '.').toSet();
+
+// The page runs from the phone's copy, so scripts, styles, fonts and images it loads from beside it on the Mac (like a katex/ folder)
+// must be copied too: one tar of the linked top-level files/folders, skipped when they add up to 50 MB or more.
+// ponytail: files reached only through ../ are not copied; add a wider fetch if pages start linking upward.
+Future<void> _fetchPageFiles(String ip, String user, String pin, String dir, File page) async {
+  final names = pageLinks(await page.readAsString()).where((n) => n != page.uri.pathSegments.last);
+  if (names.isEmpty) return;
+  final tar = '${page.path}.files.tar';
+  final cmd = 'cd ${_q(dir)} || exit 0; set --; for n in ${names.map(_q).join(' ')}; do [ -e "\$n" ] && set -- "\$@" "\$n"; done; '
+      '[ \$# -gt 0 ] && [ "\$(du -sk "\$@" | awk \'{s+=\$1} END{print s+0}\')" -lt 51200 ] && COPYFILE_DISABLE=1 tar -cf - "\$@" 2>/dev/null; exit 0';
+  try {
+    await Engine.fetch('$ip:22', user, pin, _FilesPageState.viaTmux(cmd), tar);
+    final t = File(tar);
+    if (t.existsSync() && t.lengthSync() > 0) await extractArchiveToDisk(TarDecoder().decodeBytes(t.readAsBytesSync()), page.parent.path);
+  } catch (_) {
+    // the page still opens; only what it links to is missing
+  } finally {
+    try { File(tar).deleteSync(); } catch (_) {}
+  }
 }
 
 // A file the Mac opened with `open` inside a phone session (see the open wrapper in RemoteWakeMenu.swift): fetch it and show the viewer.
